@@ -70,3 +70,9 @@ test('position answers retain action confidence separately from noul values', as
   } })));
   expect(await judgePosition(input)).toMatchObject({ action: { value: 'exit', confidence: 0.92 }, withdrawalRisk: 0.8, yieldCollapse: 0.99 });
 });
+
+test('position state matches the spec example: rounded amount, no vault address', () => {
+  const text = renderPositionState({ ...input, position: { ...position, vault: '0x7504b078d1f2b90fb9fcaf3d22753311013ea0ac', assets: '600003267' } });
+  expect(text).toMatch(/^Holding 600 USDC in Clearstar USDC \(mirror\)\. APY at deposit 6\.3%, now 0\.9%\. Utilization 92% \(was 71%\)\./);
+  expect(text).not.toContain('0x');
+});
