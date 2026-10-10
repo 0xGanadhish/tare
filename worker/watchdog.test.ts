@@ -28,6 +28,20 @@ function setup(over: Partial<WatchdogDeps> = {}, updates: Array<{ apyBps: number
 }
 
 describe('watchdog', () => {
+  test('baseline seeded with a checksummed address applies to lowercase log addresses', async () => {
+    const C = '0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC' as const;
+    const judge = vi.fn(async () => judgment('exit', 0.95));
+    const deps = {
+      readStats: vi.fn(async () => [{ vault: C.toLowerCase() as typeof C, apyBps: 50, utilBps: 9900 }]),
+      readEnabled: vi.fn(async () => [{ owner: O, vault: C }]),
+      judge, exit: vi.fn(async () => ({ txHash: TX, seconds: 0.6 })), emit: vi.fn(), retryDelayMs: 0,
+    } as WatchdogDeps;
+    const wd = createWatchdog(deps);
+    wd.seed([{ vault: C, apyBps: 650, utilBps: 7100 }]);
+    await wd.tick();
+    expect(judge).toHaveBeenCalledWith(expect.objectContaining({ atDeposit: { apyBps: 650, utilBps: 7100 } }));
+  });
+
   test('auto-exits when exit confidence ≥ 0.9 and autopilot is on', async () => {
     const { wd, deps, types } = setup({}, [[{ apyBps: 90, utilBps: 9200 }]]);
     await wd.tick();

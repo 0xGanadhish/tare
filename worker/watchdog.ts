@@ -20,8 +20,10 @@ const MAX_EXIT_RETRIES = 2;
 const FALLBACK_UTIL_BPS = 9_500;
 
 export function createWatchdog(deps: WatchdogDeps) {
-  const baseline = new Map<Address, VaultStats>(); // stats the first time we saw the vault ("at deposit")
-  const judged = new Map<Address, VaultStats>(); // stats at the last judgement
+  // Keyed by lowercase address: seeds come checksummed from the address book, log addresses come lowercase.
+  const baseline = new Map<string, VaultStats>(); // stats the first time we saw the vault ("at deposit")
+  const judged = new Map<string, VaultStats>(); // stats at the last judgement
+  const key = (vault: Address) => vault.toLowerCase();
   let seq = 0;
 
   const emit = (e: Omit<WatchEvent, 'id' | 'at'>) =>
@@ -47,9 +49,9 @@ export function createWatchdog(deps: WatchdogDeps) {
   }
 
   async function handle(vault: Address, stats: VaultStats) {
-    const atDeposit = baseline.get(vault) ?? stats;
-    if (!baseline.has(vault)) baseline.set(vault, stats);
-    if (!shouldRejudge(judged.get(vault) ?? null, stats)) return;
+    const atDeposit = baseline.get(key(vault)) ?? stats;
+    if (!baseline.has(key(vault))) baseline.set(key(vault), stats);
+    if (!shouldRejudge(judged.get(key(vault)) ?? null, stats)) return;
 
     const owners = (await deps.readEnabled()).filter((e) => e.vault.toLowerCase() === vault.toLowerCase()).map((e) => e.owner);
     let j: PositionJudgment;
@@ -62,7 +64,7 @@ export function createWatchdog(deps: WatchdogDeps) {
       }
       return;
     }
-    judged.set(vault, stats);
+    judged.set(key(vault), stats);
     await emit({ vault, type: 'judged', confidence: j.action.confidence, judgment: j,
       message: explainJudgment(j) });
 
@@ -82,8 +84,8 @@ export function createWatchdog(deps: WatchdogDeps) {
   return {
     /** Record the current stats as the baseline without judging (used at startup). */
     seed(all: StatsUpdate[]) {
-      for (const s of all) baseline.set(s.vault, { apyBps: s.apyBps, utilBps: s.utilBps });
-      for (const s of all) judged.set(s.vault, { apyBps: s.apyBps, utilBps: s.utilBps });
+      for (const s of all) baseline.set(key(s.vault), { apyBps: s.apyBps, utilBps: s.utilBps });
+      for (const s of all) judged.set(key(s.vault), { apyBps: s.apyBps, utilBps: s.utilBps });
     },
     async tick() {
       const updates = await deps.readStats();
