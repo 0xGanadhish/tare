@@ -58,14 +58,23 @@ export default function ExplorePage() {
         </div>
         <label className="flex items-center gap-2 text-[12px] text-secondary">
           <span className="mono text-[10.5px] uppercase tracking-[0.06em] text-muted">Protocol</span>
-          <select value={protocol} onChange={(e) => setProtocol(e.target.value)} className="rounded-full border border-hairline bg-white px-3 py-1.5 text-[12px] text-ink">
-            <option value="all">All protocols</option>
-            {protocols.map((p) => (
-              <option key={p} value={p}>
-                {formatProject(p)}
-              </option>
-            ))}
-          </select>
+          <span className="relative inline-flex">
+            <select
+              value={protocol}
+              onChange={(e) => setProtocol(e.target.value)}
+              className={`cursor-pointer appearance-none rounded-full border py-1.5 pl-3.5 pr-8 text-[12px] leading-[1.5] outline-none transition hover:border-ink/40 focus-visible:border-ink ${protocol === 'all' ? 'border-hairline bg-white text-secondary' : 'border-ink bg-ink text-white'}`}
+            >
+              <option value="all">All protocols</option>
+              {protocols.map((p) => (
+                <option key={p} value={p}>
+                  {formatProject(p)}
+                </option>
+              ))}
+            </select>
+            <svg aria-hidden viewBox="0 0 12 12" className={`pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 ${protocol === 'all' ? 'text-muted' : 'text-white'}`} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 4.5 6 7.5 9 4.5" />
+            </svg>
+          </span>
         </label>
       </div>
 
