@@ -18,8 +18,10 @@ export function renderPoolState(p: Pool): string {
 
 export function renderPositionState({ position: p, atDeposit, alternative }: PositionInput): string {
   const token = MAINNET_TOKENS.find((t) => p.mirrorOf.toUpperCase().split(/[^A-Z0-9]+/).includes(t.symbol.toUpperCase()));
-  const holding = token ? `${formatUnits(BigInt(p.assets), token.decimals)} ${token.symbol}` : `${p.assets} asset base units`;
-  return `Holding ${holding} in ${p.mirrorOf} (mirror ${p.vault}). `
+  // Rounded and address-free, as in the spec's example state: dust digits and hex add noise to Jev's read.
+  const amount = token ? Number(formatUnits(BigInt(p.assets), token.decimals)).toLocaleString('en-US', { maximumFractionDigits: 2 }) : null;
+  const holding = token ? `${amount} ${token.symbol}` : `${p.assets} asset base units`;
+  return `Holding ${holding} in ${p.mirrorOf} (mirror). `
     + `APY at deposit ${atDeposit.apyBps / 100}%, now ${p.apyBps / 100}%. `
     + `Utilization ${p.utilBps / 100}% (was ${atDeposit.utilBps / 100}%). `
     + `Utilization-implied withdrawable liquidity ${Math.max(0, 100 - p.utilBps / 100)}% of vault. `
