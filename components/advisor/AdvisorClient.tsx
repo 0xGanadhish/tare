@@ -1,0 +1,175 @@
+'use client';
+
+import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { VerdictSlip } from '@/components/slip/VerdictSlip';
+import { Button } from '@/components/ui/Button';
+import { formatPct } from '@/components/field/format';
+import { addresses } from '@/shared/contracts';
+import type { Intent, Recommendation } from '@/shared/types';
+import { DepositFlow } from './DepositFlow';
+import { IntentChips, needsPick } from './IntentChips';
+
+const EXAMPLE = '500 USDC, safe, 3 months';
+
+/** Manual-picker intent used when Jev cannot parse (spec §11: chips become manual pickers). */
+const blankIntent = (text: string): Intent => ({
+  text,
+  amount: null,
+  asset: null,
+  risk: { value: 'low', confidence: 0 },
+  horizon: { value: 'medium', confidence: 0 },
+  assetPref: { value: 'any', confidence: 0 },
+});
+
+async function post<T>(url: string, body: unknown): Promise<T> {
+  const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const j = (await r.json().catch(() => ({}))) as T & { error?: string };
+  if (!r.ok) throw new Error(j.error ?? `Request failed (${r.status})`);
+  return j;
+}
+
+export function AdvisorClient() {
+  const params = useSearchParams();
+  const prefill = params.get('q') ?? '';
+  const [text, setText] = useState(prefill);
+  const [intent, setIntent] = useState<Intent | null>(null);
+  const [recs, setRecs] = useState<Recommendation[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const seq = useRef(0);
+
+  const advise = useCallback(async (i: Intent) => {
+    const mine = ++seq.current;
+    setBusy(true);
+    setError(null);
+    try {
+      const { recommendations } = await post<{ recommendations: Recommendation[] }>('/api/advise', { intent: i });
+      if (mine === seq.current) setRecs(recommendations.slice(0, 3));
+    } catch (e) {
+      if (mine === seq.current) setError(e instanceof Error ? e.message : 'Could not get recommendations');
+    } finally {
+      if (mine === seq.current) setBusy(false);
+    }
+  }, []);
+
+  const submit = useCallback(
+    async (raw: string) => {
+      const q = raw.trim();
+      if (!q) return;
+      const mine = ++seq.current;
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      setRecs(null);
+      let parsed: Intent;
+      try {
+        parsed = await post<Intent>('/api/intent', { text: q });
+      } catch {
+        parsed = blankIntent(q);
+        setNotice('Jev could not read that, so pick the options yourself.');
+      }
+      if (mine !== seq.current) return;
+      setIntent(parsed);
+      if (needsPick(parsed)) {
+        setBusy(false);
+        return;
+      }
+      await advise(parsed);
+    },
+    [advise],
+  );
+
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefill && !prefilled.current) {
+      prefilled.current = true;
+      void submit(prefill);
+    }
+  }, [prefill, submit]);
+
+  const onChips = (next: Intent) => {
+    setIntent(next);
+    if (!needsPick(next)) void advise(next);
+  };
+
+  return (
+    <div>
+      <h1 className="display text-[30px] sm:text-[38px]">Advisor</h1>
+      <p className="mt-1 text-[14px] text-secondary">Say what you want in plain words. Jev reads it, then ranks pools it trusts.</p>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit(text);
+        }}
+        className="mt-6 flex max-w-[640px] flex-col gap-2 sm:flex-row"
+      >
+        <label htmlFor="intent" className="sr-only">
+          What do you want to do?
+        </label>
+        <input
+          id="intent"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={EXAMPLE}
+          className="min-w-0 flex-1 rounded-full border border-hairline bg-white px-4 py-2.5 text-[13px] outline-none focus:border-ink/40"
+        />
+        <Button type="submit" disabled={busy || !text.trim()}>
+          {busy ? 'Thinking…' : 'Find yields →'}
+        </Button>
+      </form>
+      {!intent && (
+        <button onClick={() => { setText(EXAMPLE); void submit(EXAMPLE); }} className="mono mt-2 pl-4 text-[11.5px] text-muted underline decoration-hairline underline-offset-4 hover:text-ink">
+          try “{EXAMPLE}”
+        </button>
+      )}
+
+      {notice && <p className="mt-4 text-[12.5px] text-secondary">{notice}</p>}
+      {intent && (
+        <div className="mt-6">
+          <IntentChips intent={intent} onChange={onChips} />
+          {needsPick(intent) && <p className="mt-2 text-[12px] text-secondary">Pick the options marked “?” to see recommendations.</p>}
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="mt-6 rounded-xl border border-avoid/40 bg-white p-4 text-[13px] text-avoid">
+          {error}
+        </p>
+      )}
+      {recs && recs.length === 0 && <p className="mt-8 text-[13px] text-muted">No pool fits this intent. Try a wider risk or asset choice.</p>}
+      {recs && recs.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mono mb-3 text-[10.5px] uppercase tracking-[0.06em] text-muted">Top {recs.length} for you</h2>
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {recs.map((r) => (
+              <VerdictSlip
+                key={r.pool.id}
+                pool={r.pool}
+                verdict={r.verdict}
+                action={
+                  <div>
+                    <p className="mb-3 text-[12.5px] text-secondary">
+                      {r.expectedReturnUsd > 0 && <>≈ ${Math.round(r.expectedReturnUsd).toLocaleString('en-US')} over your horizon at {formatPct(r.realApy, 2)} real APY. </>}
+                      {r.fitReasons.join(' · ')}
+                    </p>
+                    {r.mirrorVault ? (
+                      <DepositFlow vault={r.mirrorVault} mirrorOf={mirrorLabel(r)} defaultAmount={intent?.amount} />
+                    ) : (
+                      <p className="mono text-[11.5px] text-muted">No testnet mirror for this pool.</p>
+                    )}
+                  </div>
+                }
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function mirrorLabel(r: Recommendation): string {
+  return addresses.mirrors?.find((m) => m.address.toLowerCase() === r.mirrorVault?.toLowerCase())?.mirrorOf ?? `${r.pool.symbol} · ${r.pool.project}`;
+}
