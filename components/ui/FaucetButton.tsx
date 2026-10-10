@@ -22,13 +22,14 @@ export function useUsdcBalance() {
   });
 }
 
-/** "Get test USDC": mints 1,000 MockUSDC to the connected wallet. Hidden until the token is deployed. */
+/** "Get test USDC": mints 1,000 MockUSDC to the connected wallet. Hidden until the token is deployed and a wallet is connected. */
 export function FaucetButton() {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const { data: balance } = useUsdcBalance();
   const token = addresses.mockUsdc;
-  if (!token) return null;
+  // Before a wallet connects, the header's WalletButton is the only call to action.
+  if (!token || !address) return null;
 
   return (
     <div className="flex items-center gap-3">
