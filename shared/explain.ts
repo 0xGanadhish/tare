@@ -42,7 +42,7 @@ export function explainFlag(f: Verdict['flags'][number]): string {
   }
   if (f.key === 'sustainable' && Number.isFinite(num)) return `Chance this APY lasts the next 30 days: ${pct(num)}.`;
   if (f.key === 'risk' && Number.isFinite(num)) {
-    return `Risk ${num} out of 5, where 1 is safest${f.confidence != null ? ` (${sure(f.confidence)})` : ''}.`;
+    return `Risk ${Number(num.toFixed(1))} out of 5, where 1 is safest${f.confidence != null ? ` (${sure(f.confidence)})` : ''}.`;
   }
   return f.text;
 }

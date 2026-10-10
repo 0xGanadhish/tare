@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { Pool, Verdict, VerdictLabel } from '@/shared/types';
+import { poolDetailsUrl, protocolUrl } from '@/shared/protocols';
 import { explainFlag } from '@/shared/explain';
-import { formatConfidence, formatPct, formatPoolName, formatTvl } from '@/components/field/format';
+import { formatConfidence, formatPct, formatPoolName, formatProject, formatTvl } from '@/components/field/format';
 
 const STAMP: Record<VerdictLabel, { text: string; cls: string }> = {
   DEPOSIT: { text: 'DEPOSIT', cls: 'border-deposit text-deposit' },
@@ -89,8 +90,26 @@ export function VerdictSlip({ pool, verdict, history, action, tilt, className }:
           </p>
         )}
       </div>
+      <PoolLinks pool={pool} />
       {action && <div className="mt-4 border-t border-hairline pt-4">{action}</div>}
     </article>
+  );
+}
+
+function PoolLinks({ pool }: { pool: Pool }) {
+  const app = protocolUrl(pool.project);
+  const cls = 'mono text-[11px] uppercase tracking-[0.06em] text-secondary underline-offset-4 hover:text-ink hover:underline';
+  return (
+    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-hairline pt-3">
+      {app && (
+        <a href={app} target="_blank" rel="noopener noreferrer" className={cls}>
+          Open on {formatProject(pool.project)} ↗
+        </a>
+      )}
+      <a href={poolDetailsUrl(pool.id)} target="_blank" rel="noopener noreferrer" className={cls}>
+        Pool details ↗
+      </a>
+    </div>
   );
 }
 
