@@ -1,0 +1,21 @@
+modelRoles:
+  default: openai-codex/gpt-6.1-sol:high
+  task: openai-codex/gpt-6.1-sol:medium
+  smol: openai-codex/gpt-6.1-sol:medium   # never gpt-6-astra
+tools:
+  approvalMode: write
+task:
+  maxConcurrency: 2
+  speculativeLaunch: false
+bash:
+  patterns:
+    - { match: "pnpm vitest*", approval: allow }
+    - { match: "pnpm test*", approval: allow }
+    - { match: "pnpm tsc*", approval: allow }
+    - { match: "forge build*", approval: allow }
+    - { match: "forge test*", approval: allow }
+    - { match: "pnpm exec tsc*", approval: allow }
+    - { match: "pnpm lint*", approval: allow }
+    - { match: "node *", approval: allow }
+    - { match: "git status*", approval: allow }
+    - { match: "git diff*", approval: allow }
