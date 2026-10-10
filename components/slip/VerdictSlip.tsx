@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Pool, Verdict, VerdictLabel } from '@/shared/types';
+import { explainFlag } from '@/shared/explain';
 import { formatConfidence, formatPct, formatPoolName, formatTvl } from '@/components/field/format';
 
 const STAMP: Record<VerdictLabel, { text: string; cls: string }> = {
@@ -36,7 +37,7 @@ export function VerdictSlip({ pool, verdict, history, action, tilt, className }:
     ['From incentives', `${Math.round(pool.incentiveShare * 100)}%`],
     ['Exit risk', exitRiskLabel(verdict)],
     ['TVL', formatTvl(pool.tvlUsd)],
-    ['Jev confidence', judged ? formatConfidence(verdict!.confidence) : '–'],
+    ['Jev is', judged ? formatConfidence(verdict!.confidence) : '–'],
   ];
   return (
     <article
@@ -78,7 +79,7 @@ export function VerdictSlip({ pool, verdict, history, action, tilt, className }:
             {verdict.flags.map((f, i) => (
               <li key={i} className="flex gap-2">
                 <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink/40" />
-                <span>{f.text}</span>
+                <span>{explainFlag(f)}</span>
               </li>
             ))}
           </ul>

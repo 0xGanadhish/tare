@@ -42,7 +42,7 @@ describe('watchdog', () => {
     await wd.tick();
     const e = events.find((x) => x.type === 'judged')!;
     expect(e.judgment).toEqual(j);
-    expect(e.message).toContain('Jev:');
+    expect(e.message).toContain('Jev says exit (95% sure)');
   });
 
   test('alerts instead of exiting when confidence is 0.75', async () => {

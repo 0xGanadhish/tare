@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { explainExitAlert, explainJudgment } from '@/shared/explain';
 import { txUrl, shortHash } from '@/components/tx/explorer';
 import type { Position, WatchEvent } from '@/shared/types';
 import { ExitButton } from './PositionCard';
@@ -67,6 +68,13 @@ export function EventFeed({ events, connected, positions }: { events: WatchEvent
   );
 }
 
+/** Plain wording, recomputed from the data so events written before the wording changed read the same. */
+function describe(e: WatchEvent): string {
+  if (e.type === 'judged' && e.judgment) return explainJudgment(e.judgment);
+  if (e.type === 'alert' && e.confidence != null && e.message.startsWith('Jev suggests')) return explainExitAlert(e.confidence);
+  return e.message;
+}
+
 function EventRow({ e, position }: { e: WatchEvent; position?: Position }) {
   const time = new Date(e.at).toLocaleTimeString('en-GB', { hour12: false });
   const secs = e.message.match(/(\d+(?:\.\d+)?)\s*s\b/)?.[1];
@@ -75,7 +83,6 @@ function EventRow({ e, position }: { e: WatchEvent; position?: Position }) {
       <div className="flex items-baseline gap-3">
         <span className="mono shrink-0 text-[10.5px] text-muted">{time}</span>
         <span className={`mono shrink-0 text-[11px] font-medium uppercase tracking-[0.04em] ${TONE[e.type]}`}>{TITLE[e.type]}</span>
-        {e.confidence != null && <span className="mono text-[10.5px] text-muted">{e.confidence.toFixed(2)}</span>}
       </div>
       {e.type === 'exit_confirmed' ? (
         <p className="mt-1 font-medium text-ink">
@@ -88,7 +95,7 @@ function EventRow({ e, position }: { e: WatchEvent; position?: Position }) {
         </p>
       ) : (
         <p className="mt-1 text-secondary">
-          {e.message}
+          {describe(e)}
           {e.txHash && <TxLink hash={e.txHash} />}
         </p>
       )}
