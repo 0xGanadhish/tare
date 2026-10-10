@@ -28,6 +28,12 @@ function setup(over: Partial<WatchdogDeps> = {}, updates: Array<{ apyBps: number
 }
 
 describe('watchdog', () => {
+  test('a partial exit says how much is still locked', async () => {
+    const { wd, events } = setup({ exit: vi.fn(async () => ({ txHash: TX, seconds: 1, block: 7n, assets: 406_000_000n, remaining: 194_000_000n })) }, [[{ apyBps: 50, utilBps: 9900 }]]);
+    await wd.tick();
+    expect(events.find((e) => e.type === 'exit_confirmed')!.message).toContain('partial: withdrew 406 USDC, 194 USDC still locked');
+  });
+
   test('baseline seeded with a checksummed address applies to lowercase log addresses', async () => {
     const C = '0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC' as const;
     const judge = vi.fn(async () => judgment('exit', 0.95));

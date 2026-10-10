@@ -84,7 +84,12 @@ function EventRow({ e, position }: { e: WatchEvent; position?: Position }) {
         <span className="mono shrink-0 text-[10.5px] text-muted">{time}</span>
         <span className={`mono shrink-0 text-[11px] font-medium uppercase tracking-[0.04em] ${TONE[e.type]}`}>{TITLE[e.type]}</span>
       </div>
-      {e.type === 'exit_confirmed' ? (
+      {e.type === 'exit_confirmed' && e.message.includes('still locked') ? (
+        <p className="mt-1 font-medium text-ink">
+          Partly out · {e.message.split(' · partial: ')[1]}
+          {e.txHash && <TxLink hash={e.txHash} />}
+        </p>
+      ) : e.type === 'exit_confirmed' ? (
         <p className="mt-1 font-medium text-ink">
           You&apos;re out · confirmed in {secs ? `${secs}s` : 'one block'}
           {e.txHash && <TxLink hash={e.txHash} />}
