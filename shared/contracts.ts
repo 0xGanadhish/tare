@@ -65,7 +65,7 @@ export const abis = {
     'error NotEnabled()',
     'error NothingToExit()',
   ]),
-  // Launch ABIs follow plan Task L1; L1 reports any difference and the orchestrator updates these.
+  // Launch ABIs match reports/L1.md.
   launchFactory: parseAbi([
     'function guardian() view returns (address)',
     'function create(string name, string symbol, address reserveVault) returns (address)',
@@ -79,11 +79,18 @@ export const abis = {
     'function totalSupply() view returns (uint256)',
     'function balanceOf(address) view returns (uint256)',
     'function reserveVault() view returns (address)',
+    'function quoteAsset() view returns (address)',
+    'function allowance(address owner, address spender) view returns (uint256)',
+    'function approve(address spender, uint256 amount) returns (bool)',
+    'function transfer(address to, uint256 amount) returns (bool)',
     'function buy(uint256 quoteIn, uint256 minTokensOut) returns (uint256)',
     'function sell(uint256 tokensIn, uint256 minQuoteOut) returns (uint256)',
     'function reserveAssets() view returns (uint256)',
     'function floorPrice() view returns (uint256)',
     'function price() view returns (uint256)',
+    'event Transfer(address indexed from, address indexed to, uint256 value)',
+    'error SlippageExceeded()',
+    'error InsufficientLiquidity(uint256 requiredShares, uint256 availableShares)',
   ]),
 } as const;
 
