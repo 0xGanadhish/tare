@@ -28,7 +28,7 @@ export default function WatchPage() {
   return (
     <div>
       <h1 className="display text-[30px] sm:text-[38px]">Watch</h1>
-      <p className="mt-1 text-[14px] text-secondary">Your mirror positions, Jev&apos;s latest judgment, and the Guardian that exits for you.</p>
+      <p className="mt-1 text-[14px] text-secondary">Your mirror positions, Jev&apos;s latest judgment, and the Guardian that exits for you. <a href="/app/admin#how" className="text-ink underline decoration-hairline underline-offset-4">How Jev decides</a></p>
 
       {!address ? (
         <p className="mt-8 rounded-xl border border-dashed border-hairline p-5 text-[13px] text-secondary">Connect your wallet (top right) to see your positions.</p>

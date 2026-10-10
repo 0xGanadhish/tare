@@ -7,6 +7,14 @@ import { abis, addresses } from '@/shared/contracts';
 import { Button } from '@/components/ui/Button';
 import { shortHash, txUrl } from '@/components/tx/explorer';
 import type { MirrorInfo } from '@/shared/types';
+import { HowJevDecides } from '@/components/admin/HowJevDecides';
+
+/** One-click scenarios for the demo. Stress clears Jev's exit bar (94–95% in testing) and leaves enough liquidity to get fully out. */
+const SCENARIOS = [
+  { label: 'Calm', apy: 650, util: 7100, note: 'Normal market. Jev should hold.' },
+  { label: 'Stress', apy: 50, util: 9500, note: 'Yield collapses, liquidity dries up. Jev should exit.' },
+  { label: 'Locked', apy: 50, util: 10000, note: 'Nothing can be withdrawn. Anyone still in is stuck.' },
+] as const;
 
 const TOKEN_KEY = 'tare-admin-token';
 
@@ -27,7 +35,11 @@ export function AdminPanel() {
   return (
     <div>
       <h1 className="display text-[30px] sm:text-[38px]">Demo controls</h1>
-      <p className="mt-1 text-[14px] text-secondary">Stress a testnet mirror vault. The operator key signs <span className="mono">setStats</span> on the server.</p>
+      <p className="mt-1 max-w-[680px] text-[14px] leading-relaxed text-secondary">
+        Each card is a testnet mirror of a real Monad vault. Here you play the market: push a vault into trouble and watch Jev and the Guardian react on{' '}
+        <a href="/app/watch" className="text-ink underline decoration-hairline underline-offset-4">Watch</a>. How it decides is{' '}
+        <a href="#how" className="text-ink underline decoration-hairline underline-offset-4">explained below</a>.
+      </p>
       <label className="mt-6 block max-w-[420px] text-[12px] text-secondary">
         Admin token (kept in this tab only)
         <input
@@ -44,6 +56,7 @@ export function AdminPanel() {
           <MirrorControl key={m.address} mirror={m} token={token} />
         ))}
       </div>
+      <HowJevDecides />
     </div>
   );
 }
@@ -54,6 +67,7 @@ function MirrorControl({ mirror, token }: { mirror: MirrorInfo; token: string })
   const base = { address: mirror.address, abi: abis.mirrorVault, chainId: monadTestnet.id, query: { refetchInterval: 4000 } } as const;
   const apyChain = useReadContract({ ...base, functionName: 'apyBps' }).data;
   const utilChain = useReadContract({ ...base, functionName: 'utilizationBps' }).data;
+  const total = useReadContract({ ...base, functionName: 'totalAssets' }).data;
   const [apy, setApy] = useState<number | null>(null);
   const [util, setUtil] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -84,15 +98,32 @@ function MirrorControl({ mirror, token }: { mirror: MirrorInfo; token: string })
     <article className="rounded-[14px] bg-paper p-5 shadow-[0_20px_40px_-24px_rgba(32,0,82,0.25),0_4px_10px_-6px_rgba(32,0,82,0.15)]">
       <h2 className="text-[16px] font-semibold tracking-[-0.02em]">{mirror.mirrorOf}</h2>
       <p className="mono mt-0.5 break-all text-[10.5px] text-muted">{mirror.address}</p>
-      <Slider label="APY" value={apyVal} max={3000} step={50} onChange={setApy} fmt={(v) => `${(v / 100).toFixed(2)}%`} />
-      <Slider label="Utilization" value={utilVal} max={10000} step={100} onChange={setUtil} fmt={(v) => `${(v / 100).toFixed(0)}%`} />
-      <div className="mt-2 flex flex-wrap gap-2">
-        {[7100, 9200, 10000].map((u) => (
-          <button key={u} onClick={() => setUtil(u)} className="mono rounded-full border border-hairline px-2.5 py-1 text-[11px] text-secondary hover:border-ink/40">
-            {u / 100}%
-          </button>
-        ))}
+      <p className="mono mt-3 text-[11px] text-muted">
+        On chain now: APY {apyChain !== undefined ? `${(Number(apyChain) / 100).toFixed(2)}%` : '–'} · utilization {utilChain !== undefined ? `${Number(utilChain) / 100}%` : '–'}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {SCENARIOS.map((sc) => {
+          const on = apyVal === sc.apy && utilVal === sc.util;
+          return (
+            <button
+              key={sc.label}
+              title={sc.note}
+              onClick={() => { setApy(sc.apy); setUtil(sc.util); }}
+              className={`rounded-full border px-3 py-1 text-[12px] transition ${on ? 'border-ink bg-ink text-white' : 'border-hairline bg-white text-secondary hover:border-ink/40'}`}
+            >
+              {sc.label} · {sc.util / 100}% / {sc.apy / 100}%
+            </button>
+          );
+        })}
       </div>
+      <Slider label="APY (what the vault pays per year)" value={apyVal} max={3000} step={50} onChange={setApy} fmt={(v) => `${(v / 100).toFixed(2)}%`} />
+      <Slider label="Utilization (share of the vault lent out)" value={utilVal} max={10000} step={100} onChange={setUtil} fmt={(v) => `${(v / 100).toFixed(0)}%`} />
+      <p className="mt-2 text-[12px] text-secondary">
+        {SCENARIOS.find((sc) => sc.apy === apyVal && sc.util === utilVal)?.note ?? 'Custom numbers.'}{' '}
+        {total !== undefined && (
+          <>At {(utilVal / 100).toFixed(0)}% utilization, <span className="mono text-ink">{Math.floor((Number(total) * (10_000 - utilVal)) / 10_000 / 1e6).toLocaleString('en-US')} USDC</span> of this vault&apos;s {Math.floor(Number(total) / 1e6).toLocaleString('en-US')} can be withdrawn.</>
+        )}
+      </p>
       <div className="mt-4">
         <Button onClick={apply} disabled={busy || !token} className="w-full sm:w-auto">
           {busy ? 'Signing & confirming…' : 'Apply'}
