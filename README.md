@@ -9,7 +9,7 @@ Tare reads every yield on Monad, uses Jev (TypeSafe's System One model) to judge
 | | |
 |---|---|
 | Live app | https://tarefi.xyz |
-| Vercel URL | TODO: add the `*.vercel.app` URL |
+| Hosting | Vercel (custom domain, HTTPS) |
 | User transactions | Monad Testnet (chain 10143) |
 | Read-only data and mirrored deploy | Monad Mainnet (chain 143) |
 | Repo | https://github.com/0xGanadhish/tare |
