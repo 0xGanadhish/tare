@@ -44,7 +44,10 @@ export async function sendExit(vault: Address, owner: Address) {
   const balanceBefore = await publicClient.readContract({ address: (await assetOf(vault)), abi: abis.mockToken, functionName: 'balanceOf', args: [owner] });
   const r = await send(guardian, abis.guardian, 'exit', [vault, owner]);
   const balanceAfter = await publicClient.readContract({ address: (await assetOf(vault)), abi: abis.mockToken, functionName: 'balanceOf', args: [owner], blockNumber: r.block });
-  return { ...r, assets: balanceAfter - balanceBefore };
+  // Withdrawals are capped by vault liquidity, so an exit can be partial: report what is still in.
+  const sharesLeft = await publicClient.readContract({ address: vault, abi: abis.mirrorVault, functionName: 'balanceOf', args: [owner], blockNumber: r.block });
+  const remaining = sharesLeft === 0n ? 0n : await publicClient.readContract({ address: vault, abi: abis.mirrorVault, functionName: 'convertToAssets', args: [sharesLeft], blockNumber: r.block });
+  return { ...r, assets: balanceAfter - balanceBefore, remaining };
 }
 
 async function assetOf(vault: Address): Promise<Address> {

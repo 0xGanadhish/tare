@@ -4,7 +4,9 @@ import type { Address, PositionJudgment, VaultStats, WatchEvent } from '../share
 
 export interface StatsUpdate extends VaultStats { vault: Address }
 export interface Enabled { owner: Address; vault: Address }
-export interface ExitResult { txHash: Address; seconds: number; block?: bigint; assets?: bigint }
+export interface ExitResult { txHash: Address; seconds: number; block?: bigint; assets?: bigint; remaining?: bigint }
+
+const usdc = (x: bigint) => (Number(x) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 2 }); // mirrors hold test USDC (6 decimals)
 export interface JudgeInput { vault: Address; owner: Address | null; stats: VaultStats; atDeposit: VaultStats }
 
 export interface WatchdogDeps {
@@ -38,7 +40,8 @@ export function createWatchdog(deps: WatchdogDeps) {
       try {
         const r = await deps.exit(vault, owner);
         await emit({ vault, owner, type: 'exit_confirmed', txHash: r.txHash, confidence,
-          message: `Exit confirmed in ${r.seconds.toFixed(1)}s${r.block !== undefined ? ` · block ${r.block}` : ''}` });
+          message: `Exit confirmed in ${r.seconds.toFixed(1)}s${r.block !== undefined ? ` · block ${r.block}` : ''}`
+            + (r.remaining ? ` · partial: withdrew ${usdc(r.assets ?? 0n)} USDC, ${usdc(r.remaining)} USDC still locked until the vault has liquidity` : '') });
         return;
       } catch (err) {
         lastErr = err;
