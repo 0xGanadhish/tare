@@ -1,7 +1,10 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createPublicClient, erc20Abi, formatUnits, http, isAddress, zeroAddress } from 'viem';
 import { monadMainnet, MULTICALL3 } from '../shared/chains';
 import { MAINNET_TOKENS, NATIVE_MON, WMON_ADDRESS } from '../shared/tokens';
-import { readPools, readVerdicts } from '../shared/cache';
+import { addresses } from '../shared/contracts';
+import { readMarket } from './api';
 import type { Address, Holding, IdleReport, Intent, MirrorInfo, Pool, Recommendation, Verdict } from '../shared/types';
 import { advise } from './advisor';
 
@@ -85,6 +88,14 @@ export async function readHoldings(address: Address): Promise<Holding[]> {
 
 export async function scanAddress(address: string): Promise<IdleReport> {
   if (!isAddress(address)) throw new InvalidAddress();
-  const [holdings, { pools }, verdicts] = await Promise.all([readHoldings(address), readPools(), readVerdicts()]);
-  return computeIdleReport(address, holdings, pools, verdicts, []);
+  const fixture = async (): Promise<IdleReport> => JSON.parse(await readFile(
+    join(process.env.FIXTURES_DIR ?? join(process.cwd(), 'fixtures'), `scan-${address.toLowerCase()}.json`), 'utf8',
+  )) as IdleReport;
+  if (process.env.OFFLINE === '1' || process.env.DATA_SOURCE === 'fixtures') return fixture();
+  try {
+    const [holdings, { pools, verdicts }] = await Promise.all([readHoldings(address), readMarket()]);
+    return computeIdleReport(address, holdings, pools, verdicts, addresses.mirrors ?? []);
+  } catch (error) {
+    try { return await fixture(); } catch { throw error; }
+  }
 }

@@ -54,6 +54,7 @@ export interface WatchEvent {
   id: string; at: string; vault: Address; owner?: Address;
   type: 'stats_changed' | 'judged' | 'alert' | 'exit_sent' | 'exit_confirmed' | 'exit_failed';
   message: string; txHash?: Address; confidence?: number;
+  judgment?: PositionJudgment; // set on 'judged' events
 }
 
 export interface VaultStats { apyBps: number; utilBps: number }

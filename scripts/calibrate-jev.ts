@@ -10,19 +10,26 @@ async function main(): Promise<void> {
     return;
   }
   const { pools } = JSON.parse(readFileSync('fixtures/pools.json', 'utf8')) as { pools: Pool[] };
-  const emission = pools.filter((p) => p.incentiveShare >= 0.9).slice(0, 2);
-  const accountable = pools.find((p) => p.project === 'accountable' && p.symbol === 'AUSD');
-  if (!accountable || emission.length < 2) throw new Error('Golden calibration pools are missing');
-  const others = pools.filter((p) => p.id !== accountable.id && !emission.some((e) => e.id === p.id)).slice(0, 2);
-  const golden: { pool: Pool; expected: VerdictLabel }[] = [
-    ...emission.map((pool) => ({ pool, expected: 'AVOID' as const })),
-    { pool: accountable, expected: 'DEPOSIT' },
-    ...others.map((pool) => ({ pool, expected: 'CONSIDER' as const })),
+  // Explicit golden cases, independent of fixture ordering. Emissions alone do not prove
+  // unsustainability; a tiny but organic base yield is a ranking issue, not an automatic veto.
+  const cases: { project: string; symbol: string; expected: VerdictLabel }[] = [
+    { project: 'aave-v3', symbol: 'SYRUPUSDC', expected: 'CONSIDER' },
+    { project: 'aave-v3', symbol: 'USDE', expected: 'AVOID' },
+    { project: 'accountable', symbol: 'AUSD', expected: 'DEPOSIT' },
+    { project: 'townsquare-lending', symbol: 'ENZOBTC', expected: 'DEPOSIT' },
+    { project: 'accountable', symbol: 'USDC', expected: 'CONSIDER' },
   ];
+  const golden = cases.map(({ project, symbol, expected }) => {
+    const pool = pools.find((p) => p.project === project && p.symbol === symbol);
+    if (!pool) throw new Error(`Golden calibration pool missing: ${project} ${symbol}`);
+    return { pool, expected };
+  });
+  const accountable = golden[2].pool;
   const probe = await jev(renderPoolState(accountable), poolQuestions);
   console.log('Live Score response:', JSON.stringify(probe.risk));
   let disagreements = 0;
   for (const { pool, expected } of golden) {
+    console.log(`Facts: incentiveShare=${pool.incentiveShare} tvlUsd=${pool.tvlUsd} apyBase=${pool.apyBase}`);
     const verdict = await judgePool(pool);
     console.log(`${pool.project} ${pool.symbol}: ${verdict.label} confidence=${verdict.confidence} risk=${verdict.risk}; expected=${expected}`);
     if (verdict.label === 'NOT_JUDGED') throw new Error('Live Jev failed during calibration');

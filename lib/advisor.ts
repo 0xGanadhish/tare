@@ -11,7 +11,7 @@ export function advise(intent: Intent, pools: Pool[], verdicts: Record<string, V
     const verdict = verdicts[p.id];
     return (intent.assetPref.value === 'any' || p.assetClass === intent.assetPref.value)
       && verdict !== undefined && verdict.label !== 'AVOID'
-      && (maxRisk === Infinity || (verdict.risk !== null && verdict.risk <= maxRisk))
+      && (verdict.label === 'NOT_JUDGED' || maxRisk === Infinity || (verdict.risk !== null && verdict.risk <= maxRisk))
       && (p.maturity === null || p.maturity <= horizonEnd);
   });
   eligible.sort((a, b) => b.realApy - a.realApy || b.tvlUsd - a.tvlUsd);
@@ -33,7 +33,8 @@ export function advise(intent: Intent, pools: Pool[], verdicts: Record<string, V
       expectedReturnUsd: (intent.amount ?? 0) * p.realApy / 100 * days / 365,
       fitReasons: [
         `${p.assetClass} asset class${intent.assetPref.value === 'any' ? ' (any accepted)' : ' matches your preference'}`,
-        `Risk ${verdicts[p.id].risk ?? 'unknown'}/5; ${intent.risk.value} appetite`,
+        verdicts[p.id].label === 'NOT_JUDGED' ? 'Risk not assessed — Jev unavailable; review before depositing'
+          : `Risk ${verdicts[p.id].risk ?? 'unknown'}/5; ${intent.risk.value} appetite`,
         `${p.realApy}% base yield, excluding token rewards`,
         p.maturity ? `Matures ${p.maturity}, within your ${days}-day horizon` : `No fixed maturity; ${days}-day horizon`,
         ...(mirror && !exact ? [`Testnet mirror of closest match: ${mirror.mirrorOf}`] : []),

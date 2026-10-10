@@ -47,3 +47,12 @@ test('medium return uses amount × base yield × 90/365', () => {
   expect(advise(intent, [p], verdicts([p]), [])[0].expectedReturnUsd).toBeCloseTo(8.01369863);
   expect(advise({ ...intent, amount: null }, [p], verdicts([p]), [])[0].expectedReturnUsd).toBe(0);
 });
+
+test('NOT_JUDGED ranks by real APY without pretending risk was assessed', () => {
+  const pools = [pool('lower', { realApy: 2 }), pool('higher', { realApy: 5 })];
+  const v = Object.fromEntries(pools.map((p) => [p.id, verdict(p, { label: 'NOT_JUDGED', risk: null, confidence: 0 })]));
+  const results = advise(intent, pools, v, []);
+  expect(results.map((r) => r.pool.id)).toEqual(['higher', 'lower']);
+  expect(results[0].verdict).toMatchObject({ label: 'NOT_JUDGED', risk: null, confidence: 0 });
+  expect(results[0].fitReasons).toContain('Risk not assessed — Jev unavailable; review before depositing');
+});

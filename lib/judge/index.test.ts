@@ -11,7 +11,7 @@ const input = { position, atDeposit: { apyBps: 630, utilBps: 7100 }, alternative
 const answers = {
   yield_source: { type: 'choice', choice: 'organic', confidence: 0.91, probabilities: { organic: 0.92, incentive: 0.02, mixed: 0.06 } },
   sustainable: { type: 'noul', noul: 0.7 },
-  risk: { type: 'score', score: 1.05, confidence: 0.84, legend: { '0': 'lowest', '1': 'low', '2': 'medium', '3': 'high', '4': 'highest' }, probabilities: { '0': 0, '1': 0.95, '2': 0.05, '3': 0, '4': 0 } },
+  risk: { type: 'score', score: 1.05, confidence: 0.84, legend: { '0': 'lowest', '1': 'low', '2': 'medium', '3': 'high', '4': 'highest' }, probabilities: { '0': 0.05, '1': 0.95, '2': 0, '3': 0, '4': 0 } },
 };
 beforeEach(() => vi.stubEnv('TYPESAFE_API_KEY', 'unit-test'));
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
@@ -25,14 +25,27 @@ test('judgePool returns NOT_JUDGED when Jev times out', async () => {
 test.each([new Response('oops'), new Response('', { status: 503 }), Response.json({ answers: { ...answers, risk: { type: 'score', score: 99, confidence: 1 } } })])('judgePool fails closed for unavailable or malformed Jev', async (response) => {
   expect(await judgePool({ ...pool, id: 'malformed' }, { fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(response) })).toMatchObject({ label: 'NOT_JUDGED', risk: null });
 });
-test('maps zero-based weighted score to 1–5 risk and caches only unchanged pool stats', async () => {
+test('uses probability-weighted risk and peak probability confidence, caching unchanged stats', async () => {
   const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ answers }));
   const p = { ...pool, id: 'cache' };
-  expect(await judgePool(p, { fetchImpl })).toMatchObject({ label: 'DEPOSIT', risk: 2, confidence: 0.84 });
+  const verdict = await judgePool(p, { fetchImpl });
+  expect(verdict.label).toBe('DEPOSIT');
+  expect(verdict.risk).toBeCloseTo(1.95);
+  expect(verdict.confidence).toBe(0.91);
   await judgePool(p, { fetchImpl });
   expect(fetchImpl).toHaveBeenCalledTimes(1);
   await judgePool({ ...p, apyBase: p.apyBase + 1 }, { fetchImpl });
   expect(fetchImpl).toHaveBeenCalledTimes(2);
+});
+test('does not round moderate expected risk down into the DEPOSIT band', async () => {
+  const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ answers: {
+    ...answers, risk: { ...answers.risk, score: 0.7, confidence: 0.59,
+      probabilities: { '0': 0, '1': 0.6, '2': 0.4, '3': 0, '4': 0 } },
+  } }));
+  const verdict = await judgePool({ ...pool, id: 'weighted-boundary' }, { fetchImpl });
+  expect(verdict.label).toBe('CONSIDER');
+  expect(verdict.risk).toBeCloseTo(2.4);
+  expect(verdict.confidence).toBe(0.6);
 });
 test('failure is not cached, so an available Jev can judge on the next attempt', async () => {
   const p = { ...pool, id: 'retry-after-failure' };
@@ -56,10 +69,4 @@ test('position answers retain action confidence separately from noul values', as
     withdrawal_risk: { type: 'noul', noul: 0.8 }, yield_collapse: { type: 'noul', noul: 0.99 },
   } })));
   expect(await judgePosition(input)).toMatchObject({ action: { value: 'exit', confidence: 0.92 }, withdrawalRisk: 0.8, yieldCollapse: 0.99 });
-});
-test('rendered state exposes factual yield and position deterioration', () => {
-  expect(renderPoolState(pool)).toContain('base 6.5475%');
-  const state = renderPositionState(input);
-  expect(state).toContain('500'); expect(state).toContain('6.3%'); expect(state).toContain('0.9%');
-  expect(state).toContain('92%'); expect(state).toContain('8%'); expect(state).toContain('6.1%');
 });

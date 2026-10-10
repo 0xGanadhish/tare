@@ -1,0 +1,180 @@
+{
+ "address": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+ "holdings": [
+  {
+   "symbol": "USDC",
+   "token": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+   "amount": 886463.114198,
+   "usd": 886248.8136919094,
+   "assetClass": "stable",
+   "earning": false
+  },
+  {
+   "symbol": "AUSD",
+   "token": "0x00000000efe302beaa2b3e6e1b18d08d69a9012a",
+   "amount": 9601.434036,
+   "usd": 9593.606270114173,
+   "assetClass": "stable",
+   "earning": false
+  },
+  {
+   "symbol": "USDT0",
+   "token": "0xe7cd86e13ac4309349f30b3435a9d337750fc82d",
+   "amount": 19429.555228,
+   "usd": 19411.90885865981,
+   "assetClass": "stable",
+   "earning": false
+  },
+  {
+   "symbol": "MON",
+   "token": "0x0000000000000000000000000000000000000000",
+   "amount": 8412366.742094602,
+   "usd": 210021.14316724514,
+   "assetClass": "mon",
+   "earning": false
+  }
+ ],
+ "idleUsd": 1125275.4719879285,
+ "potentialYearlyUsd": 152994.23206834745,
+ "suggestions": [
+  {
+   "pool": {
+    "id": "59354ac4-db33-5021-a507-72b13b30b441",
+    "project": "accountable",
+    "symbol": "USDC",
+    "assetClass": "stable",
+    "tvlUsd": 7497950,
+    "apy": 14.79416,
+    "apyBase": 13.87698,
+    "apyReward": 0.91717,
+    "apyMean30d": 16.43025,
+    "sigma": 0.3143,
+    "realApy": 13.87698,
+    "incentiveShare": 0.061995408999226724,
+    "apyPct7D": -2.88303,
+    "ilRisk": false,
+    "exposure": "single",
+    "maturity": null,
+    "underlying": [
+     "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+    ],
+    "meta": "Earn ACC Points"
+   },
+   "verdict": {
+    "poolId": "59354ac4-db33-5021-a507-72b13b30b441",
+    "label": "DEPOSIT",
+    "confidence": 0.5,
+    "risk": null,
+    "yieldSource": null,
+    "band": "low",
+    "flags": [],
+    "statsHash": "14.79:7497950",
+    "judgedAt": "2026-10-10T06:19:09.967Z",
+    "source": "heuristic-placeholder"
+   },
+   "realApy": 13.87698,
+   "expectedReturnUsd": 127009.66015958047,
+   "fitReasons": [
+    "stable asset class matches your preference",
+    "Risk unknown/5; high appetite",
+    "13.87698% base yield, excluding token rewards",
+    "No fixed maturity; 365-day horizon",
+    "Testnet mirror of closest match: August USDC v2 · Morpho"
+   ],
+   "mirrorVault": "0x92b4e57F3DD6450C65a45d081D0e97d5f5f9aA43"
+  },
+  {
+   "pool": {
+    "id": "d0b95ca3-d601-5de8-a88e-04f3a61f4039",
+    "project": "accountable",
+    "symbol": "USDC",
+    "assetClass": "stable",
+    "tvlUsd": 5438479,
+    "apy": 12.12625,
+    "apyBase": 11.64,
+    "apyReward": 0.48625,
+    "apyMean30d": 12.10329,
+    "sigma": 0.0016,
+    "realApy": 11.64,
+    "incentiveShare": 0.04009895887021957,
+    "apyPct7D": -0.01375,
+    "ilRisk": false,
+    "exposure": "single",
+    "maturity": null,
+    "underlying": [
+     "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+    ],
+    "meta": null
+   },
+   "verdict": {
+    "poolId": "d0b95ca3-d601-5de8-a88e-04f3a61f4039",
+    "label": "DEPOSIT",
+    "confidence": 0.5,
+    "risk": null,
+    "yieldSource": null,
+    "band": "low",
+    "flags": [],
+    "statsHash": "12.13:5438479",
+    "judgedAt": "2026-10-10T06:19:09.967Z",
+    "source": "heuristic-placeholder"
+   },
+   "realApy": 11.64,
+   "expectedReturnUsd": 106535.60387472756,
+   "fitReasons": [
+    "stable asset class matches your preference",
+    "Risk unknown/5; high appetite",
+    "11.64% base yield, excluding token rewards",
+    "No fixed maturity; 365-day horizon",
+    "Testnet mirror of closest match: August USDC v2 · Morpho"
+   ],
+   "mirrorVault": "0x92b4e57F3DD6450C65a45d081D0e97d5f5f9aA43"
+  },
+  {
+   "pool": {
+    "id": "1a9c61c7-4094-4ee7-8d46-6ea8fb5689f1",
+    "project": "accountable",
+    "symbol": "USDC",
+    "assetClass": "stable",
+    "tvlUsd": 74979582,
+    "apy": 10.82561,
+    "apyBase": 10.5,
+    "apyReward": 0.32561,
+    "apyMean30d": 11.60528,
+    "sigma": 0.10156,
+    "realApy": 10.5,
+    "incentiveShare": 0.030077750814965627,
+    "apyPct7D": -0.99195,
+    "ilRisk": false,
+    "exposure": "single",
+    "maturity": null,
+    "underlying": [
+     "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+    ],
+    "meta": "Earn ACC Points"
+   },
+   "verdict": {
+    "poolId": "1a9c61c7-4094-4ee7-8d46-6ea8fb5689f1",
+    "label": "DEPOSIT",
+    "confidence": 0.5,
+    "risk": null,
+    "yieldSource": null,
+    "band": "low",
+    "flags": [],
+    "statsHash": "10.83:74979582",
+    "judgedAt": "2026-10-10T06:19:09.967Z",
+    "source": "heuristic-placeholder"
+   },
+   "realApy": 10.5,
+   "expectedReturnUsd": 96101.70452617176,
+   "fitReasons": [
+    "stable asset class matches your preference",
+    "Risk unknown/5; high appetite",
+    "10.5% base yield, excluding token rewards",
+    "No fixed maturity; 365-day horizon",
+    "Testnet mirror of closest match: August USDC v2 · Morpho"
+   ],
+   "mirrorVault": "0x92b4e57F3DD6450C65a45d081D0e97d5f5f9aA43"
+  }
+ ],
+ "asOf": "2026-10-10T07:10:47.618Z"
+}

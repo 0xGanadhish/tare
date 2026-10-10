@@ -44,11 +44,14 @@ export async function judgePool(p: Pool, opts: JevOptions = {}): Promise<Verdict
       const risk = answers.risk;
       const sustainable = answers.sustainable;
       if (risk.type !== 'score' || sustainable.type !== 'noul') throw new JevUnavailable('Invalid pool answers');
-      // The API returns a probability-weighted zero-based level; nearest level maps to 1–5.
-      const score = Math.round(risk.score) + 1;
+      // Score probabilities use zero-based legend levels; preserve the expectation, not a rounded category.
+      const probabilities = Object.entries(risk.probabilities);
+      const mass = probabilities.reduce((sum, [, probability]) => sum + probability, 0);
+      const score = 1 + probabilities.reduce((sum, [level, probability]) => sum + Number(level) * probability, 0) / mass;
+      const confidence = Math.max(...probabilities.map(([, probability]) => probability));
       return { poolId: p.id, statsHash: hash, judgedAt: new Date().toISOString(), source: 'jev',
         ...combineVerdict({ yieldSource: answerChoice(answers.yield_source), sustainable: sustainable.noul,
-          risk: { score, confidence: risk.confidence } }) };
+          risk: { score, confidence } }) };
     } catch (error) {
       judgments.delete(key);
       return { poolId: p.id, statsHash: hash, judgedAt: new Date().toISOString(), label: 'NOT_JUDGED',

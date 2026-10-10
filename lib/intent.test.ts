@@ -22,3 +22,12 @@ test('parseIntent keeps low-confidence choices for the UI to ask the user', asyn
     risk: { value: 'low', confidence: 0.55 }, horizon: { value: 'medium', confidence: 0.9 }, assetPref: { value: 'stable', confidence: 0.95 },
   });
 });
+
+test('Jev failure preserves parsed facts and exposes manual choices with zero confidence', async () => {
+  vi.stubEnv('TYPESAFE_API_KEY', 'unit-test');
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 503 })));
+  expect(await parseIntent('500usdc')).toEqual({
+    text: '500usdc', amount: 500, asset: 'USDC',
+    risk: { value: 'low', confidence: 0 }, horizon: { value: 'medium', confidence: 0 }, assetPref: { value: 'any', confidence: 0 },
+  });
+});

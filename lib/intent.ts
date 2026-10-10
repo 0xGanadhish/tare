@@ -1,5 +1,5 @@
 import type { Choice, Intent } from '../shared/types';
-import { jev, type JevAnswer, type JevQuestion } from './jev';
+import { jev, JevUnavailable, type JevAnswer, type JevQuestion } from './jev';
 
 const tickers = 'USDT0|SYRUPUSDC|EARNAUSD|USDC|AUSD|USDT|USDE|GHO|XAUT0|XAUT|SHMON|WMON|SMON|GMON|MON|CBBTC|WBTC|BTC|WETH|ETH';
 const number = '(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?[kKmM]?';
@@ -37,7 +37,14 @@ const questions: Record<string, JevQuestion> = {
 };
 
 export async function parseIntent(text: string): Promise<Intent> {
-  const answers = await jev(text, questions);
-  return { text, ...parseAmount(text), risk: answerChoice(answers.risk_appetite),
-    horizon: answerChoice(answers.horizon), assetPref: answerChoice(answers.asset_pref) };
+  try {
+    if (process.env.OFFLINE === '1') throw new JevUnavailable('Offline mode');
+    const answers = await jev(text, questions);
+    return { text, ...parseAmount(text), risk: answerChoice(answers.risk_appetite),
+      horizon: answerChoice(answers.horizon), assetPref: answerChoice(answers.asset_pref) };
+  } catch (error) {
+    if (!(error instanceof JevUnavailable)) throw error;
+    return { text, ...parseAmount(text), risk: { value: 'low', confidence: 0 },
+      horizon: { value: 'medium', confidence: 0 }, assetPref: { value: 'any', confidence: 0 } };
+  }
 }
