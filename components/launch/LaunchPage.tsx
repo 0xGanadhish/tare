@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePublicClient, useWriteContract } from 'wagmi';
@@ -9,6 +8,7 @@ import type { Address, Pool, Verdict } from '@/shared/types';
 import { TxButton } from '@/components/tx/TxButton';
 import { Button } from '@/components/ui/Button';
 import { Deploying } from './Deploying';
+import { TokenCard } from './TokenCard';
 
 export function LaunchPage() {
   if (!addresses.launchFactory) return <Deploying />;
@@ -84,17 +84,20 @@ function Launch({ factory }: { factory: Address }) {
             <h2 id="tokens-title" className="display text-2xl">Launched tokens</h2>
             <span className="mono text-[10px] uppercase tracking-wider text-muted">Onchain registry</span>
           </div>
-          {tokens.isPending && <p role="status" className="mt-6 text-sm text-secondary">Reading launch events…</p>}
-          {tokens.isError && <div role="alert" className="mt-6 space-y-3 text-sm text-secondary"><p>Could not read launch events. No token list is being assumed.</p><p className="break-words text-xs">{tokens.error.message}</p><Button size="sm" variant="secondary" onClick={() => void tokens.refetch()}>Retry</Button></div>}
+          {tokens.isPending && <p role="status" className="mt-6 text-sm text-secondary">Reading launched tokens…</p>}
+          {tokens.isError && <div role="alert" className="mt-6 space-y-3 text-sm text-secondary"><p>Could not read launched tokens. No token list is being assumed.</p><p className="break-words text-xs">{tokens.error.message}</p><Button size="sm" variant="secondary" onClick={() => void tokens.refetch()}>Retry</Button></div>}
           {!tokens.isError && tokens.data?.length === 0 && <p className="mt-6 border-t border-hairline py-6 text-sm text-secondary">No tokens launched yet. The first reserve starts here.</p>}
-          <ul className="mt-6 divide-y divide-hairline border-t border-hairline">
-            {tokens.data?.map((launch) => <li key={launch.token}>
-              <Link href={`/app/launch/${launch.token}`} className="group block py-5">
-                <div className="flex justify-between gap-4"><span className="break-words text-lg font-medium">{launch.name}</span><span className="mono text-sm text-secondary">{launch.symbol} ↗</span></div>
-                <p className="mono mt-2 break-all text-[10px] text-muted">{launch.token}</p>
-                <p className="mt-2 text-xs text-secondary">Testnet mirror · {mirrors.find((mirror) => mirror.address.toLowerCase() === launch.reserveVault.toLowerCase())?.mirrorOf ?? launch.reserveVault}</p>
-              </Link>
-            </li>)}
+          <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+            {tokens.data?.map((launch) => (
+              <li key={launch.token}>
+                <TokenCard
+                  token={launch.token}
+                  name={launch.name}
+                  symbol={launch.symbol}
+                  reserveLabel={`Testnet mirror · ${mirrors.find((mirror) => mirror.address.toLowerCase() === launch.reserveVault.toLowerCase())?.mirrorOf ?? launch.reserveVault}`}
+                />
+              </li>
+            ))}
           </ul>
         </section>
       </div>
