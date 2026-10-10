@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { parseAbiItem } from 'viem';
 import { appendEvent } from '../shared/cache';
 import { abis, addresses } from '../shared/contracts';
@@ -21,6 +22,20 @@ const enabledEvent = parseAbiItem('event Enabled(address indexed owner, address 
 const disabledEvent = parseAbiItem('event Disabled(address indexed owner, address indexed vault)');
 
 const CHUNK = 100n; // the public RPC caps getLogs ranges
+const CONCURRENCY = 8;
+
+interface WorkerState { guardian: Address; lastBlock: string; enabled: Enabled[] }
+const stateFile = () => join(process.env.CACHE_DIR ?? join(process.cwd(), 'cache'), 'worker-state.json');
+function loadState(): WorkerState | null {
+  try { return JSON.parse(readFileSync(stateFile(), 'utf8')) as WorkerState; } catch { return null; }
+}
+function persistState(st: WorkerState) {
+  try {
+    mkdirSync(dirname(stateFile()), { recursive: true });
+    writeFileSync(`${stateFile()}.tmp`, JSON.stringify(st));
+    renameSync(`${stateFile()}.tmp`, stateFile());
+  } catch { /* state is an optimisation only */ }
+}
 
 /** First block of the testnet deploy (from the Foundry broadcast), so the Guardian replay stays short. */
 function deployBlock(head: bigint): bigint {
@@ -61,29 +76,46 @@ async function main() {
   };
 
   let fromBlock = await publicClient.getBlockNumber();
-  let guardianFrom = fromBlock;
   const enabledSet = new Map<string, Enabled>();
-  // Rebuild autopilot state from chain logs (Guardian was deployed recently; one full replay is cheap).
-  async function replayEnabled(from: bigint, to: bigint) {
-    for (let start = from; start <= to; start += CHUNK) {
-      const end = start + CHUNK - 1n < to ? start + CHUNK - 1n : to;
-      await replayRange(start, end);
-    }
+  // Resume from cache/worker-state.json (last replayed block + enabled set); replay only the delta.
+  let guardianFrom = deployBlock(fromBlock) - 1n; // last block already applied to enabledSet
+  const saved = loadState();
+  if (saved && saved.guardian.toLowerCase() === guardian.toLowerCase() && BigInt(saved.lastBlock) <= fromBlock) {
+    guardianFrom = BigInt(saved.lastBlock);
+    for (const e of saved.enabled) enabledSet.set(`${e.owner}:${e.vault}`.toLowerCase(), e);
   }
-  async function replayRange(from: bigint, to: bigint) {
-    const [en, dis] = await Promise.all([
-      publicClient.getLogs({ address: guardian, event: enabledEvent, fromBlock: from, toBlock: to }),
-      publicClient.getLogs({ address: guardian, event: disabledEvent, fromBlock: from, toBlock: to }),
-    ]);
-    const all = [...en.map((l) => ({ l, on: true })), ...dis.map((l) => ({ l, on: false }))]
+  let lastSave = 0;
+  const saveState = (force = false) => {
+    if (!force && Date.now() - lastSave < 30_000) return;
+    lastSave = Date.now();
+    persistState({ guardian, lastBlock: guardianFrom.toString(), enabled: [...enabledSet.values()] });
+  };
+
+  async function fetchRange(from: bigint, to: bigint) {
+    const logs = await publicClient.getLogs({ address: guardian, events: [enabledEvent, disabledEvent], fromBlock: from, toBlock: to });
+    return logs.map((l) => ({ l, on: l.eventName === 'Enabled' }))
       .sort((a, b) => Number(a.l.blockNumber! - b.l.blockNumber!) || (a.l.logIndex! - b.l.logIndex!));
-    for (const { l, on } of all) {
-      const key = `${l.args.owner}:${l.args.vault}`.toLowerCase();
-      if (on) enabledSet.set(key, { owner: l.args.owner as Address, vault: l.args.vault as Address });
-      else enabledSet.delete(key);
+  }
+  /** Replay (guardianFrom, to] in parallel batches of chunks, applying results in block order. */
+  async function replayEnabled(to: bigint) {
+    while (guardianFrom < to) {
+      const ranges: [bigint, bigint][] = [];
+      for (let start = guardianFrom + 1n; start <= to && ranges.length < CONCURRENCY; start += CHUNK) {
+        ranges.push([start, start + CHUNK - 1n < to ? start + CHUNK - 1n : to]);
+      }
+      const results = await Promise.all(ranges.map(([f, t]) => fetchRange(f, t)));
+      for (const all of results) {
+        for (const { l, on } of all) {
+          const key = `${l.args.owner}:${l.args.vault}`.toLowerCase();
+          if (on) enabledSet.set(key, { owner: l.args.owner as Address, vault: l.args.vault as Address });
+          else enabledSet.delete(key);
+        }
+      }
+      guardianFrom = ranges[ranges.length - 1][1];
+      saveState(true);
     }
   }
-  await replayEnabled(deployBlock(fromBlock), fromBlock).catch((e) => log('enabled replay failed', e instanceof Error ? e.message.split('\n')[0] : e));
+  await replayEnabled(fromBlock).catch((e) => log('enabled replay failed', e instanceof Error ? e.message.split('\n').slice(0, 4).join(' | ') : e));
 
   const wd = createWatchdog({
     async readStats() {
@@ -91,8 +123,9 @@ async function main() {
       if (head <= fromBlock) return [];
       const from = fromBlock + 1n;
       const logs = await publicClient.getLogs({ address: vaults, event: statsEvent, fromBlock: from, toBlock: head });
-      await replayEnabled(guardianFrom + 1n, head);
-      guardianFrom = head;
+      const before = enabledSet.size;
+      await replayEnabled(head);
+      if (enabledSet.size !== before) saveState(true);
       fromBlock = head;
       return logs
         .sort((a, b) => Number(a.blockNumber! - b.blockNumber!) || (a.logIndex! - b.logIndex!))
