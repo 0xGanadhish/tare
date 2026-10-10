@@ -1,4 +1,5 @@
 import type { PositionJudgment, Verdict } from './types';
+import { AUTO_EXIT_CONFIDENCE } from '../lib/judge/gating';
 
 /** Plain-language wording for Jev's numbers. Every number shown to a user says what it measures. */
 
@@ -23,7 +24,7 @@ export function explainJudgment(j: PositionJudgment): string {
 }
 
 /** Why an exit call became an alert rather than an automatic exit. */
-export function explainExitAlert(confidence: number, autopilotThreshold = 0.9): string {
+export function explainExitAlert(confidence: number, autopilotThreshold = AUTO_EXIT_CONFIDENCE): string {
   return `Jev recommends exiting (${sure(confidence)}). Autopilot only acts on its own at ${pct(autopilotThreshold)} or more, so this one is your call.`;
 }
 

@@ -1,4 +1,4 @@
-import { decideAction, shouldRejudge } from '../lib/judge/gating';
+import { decideAction, FALLBACK_UTIL_BPS, shouldRejudge } from '../lib/judge/gating';
 import { explainExitAlert, explainJudgment, sure } from '../shared/explain';
 import type { Address, PositionJudgment, VaultStats, WatchEvent } from '../shared/types';
 
@@ -19,7 +19,6 @@ export interface WatchdogDeps {
 }
 
 const MAX_EXIT_RETRIES = 2;
-const FALLBACK_UTIL_BPS = 9_500;
 
 export function createWatchdog(deps: WatchdogDeps) {
   // Keyed by lowercase address: seeds come checksummed from the address book, log addresses come lowercase.
