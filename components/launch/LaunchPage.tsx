@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePublicClient, useWriteContract } from 'wagmi';
 import { abis, addresses } from '@/shared/contracts';
@@ -9,13 +9,6 @@ import type { Address, Pool, Verdict } from '@/shared/types';
 import { TxButton } from '@/components/tx/TxButton';
 import { Button } from '@/components/ui/Button';
 import { Deploying } from './Deploying';
-
-interface LaunchLog {
-  args: { token: Address; name: string; symbol: string; reserveVault: Address };
-  transactionHash: `0x${string}` | null;
-  logIndex: number | null;
-  blockNumber: bigint | null;
-}
 
 export function LaunchPage() {
   if (!addresses.launchFactory) return <Deploying />;
@@ -28,7 +21,6 @@ function Launch({ factory }: { factory: Address }) {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [selection, setSelection] = useState<Address | null>(null);
-  const registry = useRef<{ deployment: bigint; through: bigint; logs: LaunchLog[] } | null>(null);
   const mirrors = addresses.mirrors ?? [];
   const pools = useQuery({
     queryKey: ['launch', 'pools'],
@@ -46,33 +38,12 @@ function Launch({ factory }: { factory: Address }) {
   const reserve = selection ?? recommended?.address ?? mirrors[0]?.address;
   const tokens = useQuery({
     queryKey: ['launch', 'tokens', factory],
-    enabled: !!client,
+    enabled: !!client && !!factory,
     queryFn: async () => {
-      if (!client) throw new Error('Testnet connection unavailable');
-      // The public testnet RPC allows only 100-block log ranges and cannot
-      // answer ancient eth_getCode calls. Record this block when deploying.
-      const configuredBlock = process.env.NEXT_PUBLIC_LAUNCH_DEPLOYMENT_BLOCK;
-      if (!configuredBlock || !/^\d+$/.test(configuredBlock)) {
-        throw new Error('Launch registry needs NEXT_PUBLIC_LAUNCH_DEPLOYMENT_BLOCK from the factory deployment receipt.');
-      }
-      const deployment = BigInt(configuredBlock);
-      const latest = await client.getBlockNumber({ cacheTime: 0 });
-      if (deployment > latest) throw new Error('The launch deployment block is ahead of Monad testnet.');
-      // Re-read the recent suffix so late execution results and recent reorgs
-      // cannot leave a permanently missing or orphaned token in the registry.
-      const overlap = registry.current ? registry.current.through - 99n : deployment;
-      const from = overlap > deployment ? overlap : deployment;
-      const logs = registry.current?.logs.filter((log) => log.blockNumber !== null && log.blockNumber < from) ?? [];
-      for (let start = from; start <= latest; start += 100n) {
-        const end = start + 99n < latest ? start + 99n : latest;
-        const batch = await client.getContractEvents({
-          address: factory, abi: abis.launchFactory, eventName: 'TokenCreated',
-          fromBlock: start, toBlock: end, strict: true,
-        });
-        logs.push(...batch.filter((log) => !log.removed));
-      }
-      registry.current = { deployment, through: latest, logs };
-      return logs;
+      if (!client || !factory) throw new Error('Testnet connection unavailable');
+      // The factory keeps its own registry, so one read lists every launch (newest first).
+      const all = await client.readContract({ address: factory, abi: abis.launchFactory, functionName: 'launches' });
+      return [...all].reverse();
     },
     refetchInterval: 10_000,
   });
@@ -117,11 +88,11 @@ function Launch({ factory }: { factory: Address }) {
           {tokens.isError && <div role="alert" className="mt-6 space-y-3 text-sm text-secondary"><p>Could not read launch events. No token list is being assumed.</p><p className="break-words text-xs">{tokens.error.message}</p><Button size="sm" variant="secondary" onClick={() => void tokens.refetch()}>Retry</Button></div>}
           {!tokens.isError && tokens.data?.length === 0 && <p className="mt-6 border-t border-hairline py-6 text-sm text-secondary">No tokens launched yet. The first reserve starts here.</p>}
           <ul className="mt-6 divide-y divide-hairline border-t border-hairline">
-            {tokens.data?.map((log) => <li key={`${log.transactionHash}-${log.logIndex}`}>
-              <Link href={`/app/launch/${log.args.token}`} className="group block py-5">
-                <div className="flex justify-between gap-4"><span className="break-words text-lg font-medium">{log.args.name}</span><span className="mono text-sm text-secondary">{log.args.symbol} ↗</span></div>
-                <p className="mono mt-2 break-all text-[10px] text-muted">{log.args.token}</p>
-                <p className="mt-2 text-xs text-secondary">Testnet mirror · {mirrors.find((mirror) => mirror.address.toLowerCase() === log.args.reserveVault.toLowerCase())?.mirrorOf ?? log.args.reserveVault}</p>
+            {tokens.data?.map((launch) => <li key={launch.token}>
+              <Link href={`/app/launch/${launch.token}`} className="group block py-5">
+                <div className="flex justify-between gap-4"><span className="break-words text-lg font-medium">{launch.name}</span><span className="mono text-sm text-secondary">{launch.symbol} ↗</span></div>
+                <p className="mono mt-2 break-all text-[10px] text-muted">{launch.token}</p>
+                <p className="mt-2 text-xs text-secondary">Testnet mirror · {mirrors.find((mirror) => mirror.address.toLowerCase() === launch.reserveVault.toLowerCase())?.mirrorOf ?? launch.reserveVault}</p>
               </Link>
             </li>)}
           </ul>
