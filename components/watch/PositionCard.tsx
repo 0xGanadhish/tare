@@ -1,6 +1,7 @@
 'use client';
 
 import { formatUnits } from 'viem';
+import { explainJudgment } from '@/shared/explain';
 import { useAccount, useWriteContract } from 'wagmi';
 import { monadTestnet } from '@/shared/chains';
 import { abis } from '@/shared/contracts';
@@ -50,7 +51,7 @@ export function PositionCard({ position }: { position: Position }) {
       </dl>
       {j ? (
         <p className="mono mt-3 text-[11px] text-secondary">
-          Jev · {j.action.value} ({j.action.confidence.toFixed(2)}) · withdrawal risk {j.withdrawalRisk.toFixed(2)} · yield collapse {j.yieldCollapse.toFixed(2)}
+          {explainJudgment(j)}
         </p>
       ) : (
         <p className="mono mt-3 text-[11px] text-muted">No judgment yet. The watchdog judges when vault stats change.</p>

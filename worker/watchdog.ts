@@ -1,4 +1,5 @@
 import { decideAction, shouldRejudge } from '../lib/judge/gating';
+import { explainExitAlert, explainJudgment, sure } from '../shared/explain';
 import type { Address, PositionJudgment, VaultStats, WatchEvent } from '../shared/types';
 
 export interface StatsUpdate extends VaultStats { vault: Address }
@@ -29,7 +30,7 @@ export function createWatchdog(deps: WatchdogDeps) {
   const sleep = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
 
   async function exitWithRetries(vault: Address, owner: Address, confidence: number) {
-    await emit({ vault, owner, type: 'exit_sent', confidence, message: 'Auto-exit sent by keeper' });
+    await emit({ vault, owner, type: 'exit_sent', confidence, message: `Jev is ${sure(confidence)} it's time to get out. Autopilot is withdrawing for you.` });
     let lastErr: unknown;
     for (let attempt = 0; attempt <= MAX_EXIT_RETRIES; attempt++) {
       try {
@@ -63,9 +64,9 @@ export function createWatchdog(deps: WatchdogDeps) {
     }
     judged.set(vault, stats);
     await emit({ vault, type: 'judged', confidence: j.action.confidence, judgment: j,
-      message: `Jev: ${j.action.value} (${Math.round(j.action.confidence * 100)}%) · withdrawal risk ${j.withdrawalRisk.toFixed(2)} · yield collapse ${j.yieldCollapse.toFixed(2)}` });
+      message: explainJudgment(j) });
 
-    const alertMsg = `Jev suggests exit (${Math.round(j.action.confidence * 100)}%)`;
+    const alertMsg = explainExitAlert(j.action.confidence);
     if (owners.length === 0) {
       const a = decideAction(j, false);
       if (a === 'alert') await emit({ vault, type: 'alert', confidence: j.action.confidence, message: alertMsg });

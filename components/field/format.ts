@@ -1,3 +1,4 @@
+import { sure } from '@/shared/explain';
 import type { Pool, Verdict } from '@/shared/types';
 
 const SPECIAL: Record<string, string> = {
@@ -39,7 +40,7 @@ export function formatPct(n: number, digits = 1): string {
 }
 
 export function formatConfidence(c: number): string {
-  return (Number.isFinite(c) ? c : 0).toFixed(2);
+  return sure(c);
 }
 
 export interface FieldStats {

@@ -19,7 +19,7 @@ export function combineVerdict(a: {
     label, confidence, band: band(confidence), risk: a.risk.score, yieldSource: a.yieldSource.value,
     flags: [
       { key: 'yield_source', text: `Yield source: ${a.yieldSource.value}`, confidence: a.yieldSource.confidence },
-      { key: 'sustainable', text: `Headline APY likely to persist for 30 days: ${a.sustainable}` },
+      { key: 'sustainable', text: `Chance this APY lasts the next 30 days: ${Math.round(a.sustainable * 100)}%` },
       { key: 'risk', text: `Risk: ${a.risk.score}/5`, confidence: a.risk.confidence },
     ],
   };
