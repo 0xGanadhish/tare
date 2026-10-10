@@ -47,3 +47,6 @@ contracts/out/
 contracts/cache/
 contracts/broadcast/
 !.env.example
+
+# Promo videos and their sources stay local
+/video/

@@ -4,6 +4,8 @@
 
 Tare reads every yield on Monad, uses Jev (TypeSafe's System One model) to judge which ones are real, helps you deposit into the right one, and can automatically pull you out when a vault turns risky.
 
+![Tare landing page: every Monad pool plotted by APY and TVL, colored by Jev's verdict](docs/screenshots/landing.jpg)
+
 ## Live
 
 | | |
@@ -15,6 +17,10 @@ Tare reads every yield on Monad, uses Jev (TypeSafe's System One model) to judge
 | Repo | https://github.com/0xGanadhish/tare |
 
 All deposits, exits and launches are real transactions on Monad Testnet. Mainnet is used only for market data and wallet scans, plus a mirrored, source-verified contract deploy (table below).
+
+**What runs where.** tarefi.xyz runs Explore, Pulse, the idle scan, the Advisor (live Jev), and every wallet action on testnet: test USDC faucet, deposit, autopilot on/off, withdraw, token launch and trading. The watcher that re-judges positions and triggers the Guardian is a long-running process, and the demo controls need the operator key, so both run on the demo machine (`pnpm worker`, see [Full setup](#full-setup)), not on Vercel.
+
+**A real autopilot exit**, triggered by Jev at 94% confidence and confirmed in 2.2 s: [`0x22d5ffad…2abb4`](https://testnet.monadvision.com/tx/0x22d5ffad10ba384975565640eca72fa39de616538283f436405162b43172abb4) (block 69,803,719).
 
 ## Deployed contracts
 
@@ -48,19 +54,57 @@ The same contracts, deployed from the same operator, so the core addresses match
 
 ## What it does
 
-- **Discover:** every Monad pool of $100k+ TVL (~166 pools, 27 protocols) grouped by asset class, shown as the Field chart and a table, plus the **Pulse** market dashboard (real vs headline APY, TVL by verdict).
-- **Decide:** Jev judges each pool and issues a verdict (DEPOSIT, CONSIDER or AVOID) with confidence and plain-language flags. Type "500 USDC, safe, 3 months" and the Advisor returns a ranked top 3.
+- **Discover:** every Monad pool of $100k+ TVL (166 pools, 20 protocols, $1.35B) grouped by asset class, shown as the Field chart and a table, plus the **Pulse** market dashboard (real vs headline APY, TVL by verdict).
+- **Decide:** Jev judges each pool and issues a verdict (DEPOSIT, CONSIDER or AVOID) with plain-language reasons ("Chance this APY lasts the next 30 days: 68%") and links to the protocol and the pool's DefiLlama page. Type "500 USDC, safe, 3 months" and the Advisor returns a ranked top 3.
 - **Idle scan:** paste any mainnet address to see idle balances and what they could earn.
 - **Deposit, Watch, Guardian:** deposit into a mirror vault with a real testnet transaction. A watchdog re-judges your position as vault stats move, and with autopilot on, the Guardian contract exits you to your own wallet before the vault locks.
 - **Launch:** create a yield-backed token whose reserve sits in a vault, so its floor price rises over time.
 
-## How Jev is used
+| Verdict slip | Advisor |
+|---|---|
+| ![Verdict slip for Accountable AUSD: DEPOSIT, with plain-language reasons](docs/screenshots/slip.jpg) | ![Advisor ranking three pools for "500 USDC, safe, 3 months"](docs/screenshots/advisor.jpg) |
 
-Code computes facts and renders them as text. Jev answers small typed questions. Code combines the answers.
+## How Jev decides
 
-1. **Parse intent.** Reads free text for risk appetite, horizon and asset preference. Confidence below 0.6 shows "?" and asks the user to choose.
-2. **Judge pools.** Per pool: yield source (organic, incentive, mixed), sustainability (0-1), risk (5 levels). `AVOID` if risk >= 4, or incentive yield with sustainability < 0.4. `DEPOSIT` if risk <= 2, not incentive, and sustainability >= 0.6. Otherwise `CONSIDER`.
-3. **Judge positions.** Chooses hold, exit or rotate, plus withdrawal-risk and yield-collapse scores. `exit` at confidence >= 0.9 with autopilot on triggers Guardian automatically; 0.6-0.9 raises an alert with a one-click exit; below 0.6 is informational. Rotation is never automatic.
+Code computes facts and renders them as text. Jev answers small typed questions with probabilities. Fixed rules in code turn the answers into actions, so Jev never holds keys or moves money by itself. The same rules are explained in the app at `/app/admin#how`.
+
+1. **Parse intent.** Reads free text for risk appetite, horizon and asset preference. If Jev is under 60% sure of one, the chip shows "?" and asks the user to pick.
+2. **Judge pools.** Per pool: where the yield comes from (real activity, token rewards, or a mix), the chance the APY lasts 30 days, and risk on a 1-5 scale (1 safest).
+   - `AVOID`: risk 4 or more, or yield paid in token rewards with under 40% chance of lasting.
+   - `DEPOSIT`: risk 2 or less, yield not from token rewards, and at least 60% chance it lasts.
+   - `CONSIDER`: everything in between.
+3. **Judge positions.** When a vault's APY moves more than 0.5 points or its utilization more than 5 points, Jev is asked: hold, exit or move? What's the chance you can't withdraw in full soon? What's the chance the yield collapses?
+   - Exit, at least 90% sure, autopilot on: the Guardian withdraws for you. Funds can only go to your wallet.
+   - Exit, 60-90% sure: an alert with a one-click Exit. You decide.
+   - Under 60% sure: logged only. Moving to another vault is never automatic.
+   - Jev unreachable: never exits on its own; alerts if utilization passes 95%.
+
+## Try the full demo
+
+With `pnpm dev` and `pnpm worker` running (see [Full setup](#full-setup)) and a wallet on Monad Testnet:
+
+1. **Get test USDC** in the header, then on **Advisor** type "500 USDC, safe, 3 months" and deposit into the top pick.
+2. On **Watch**, click *Allow Guardian to exit*, then *Turn autopilot on*.
+3. On **Demo controls** (`/app/admin`, needs `ADMIN_TOKEN`), pick **Stress · 95% / 0.5%** on that vault and Apply.
+4. Back on Watch, within a few seconds: "Jev says exit (about 95% sure)", then the Guardian exit and "You're out" with the transaction link.
+5. **Calm · 71% / 6.5%** resets the vault. **Locked · 100%** shows what happens to anyone still in: nothing can be withdrawn.
+
+![Demo controls with Calm, Stress and Locked presets and the withdrawable amount at the chosen utilization](docs/screenshots/admin.jpg)
+
+At 95% utilization, 5% of a 40,000 USDC mirror vault (about 2,000 USDC) can still be withdrawn, so a small position gets fully out. Withdrawals are capped by liquidity: at 99% only 1% can leave, and the feed reports a partial exit as "Partly out" with the amount still locked.
+
+## Business model
+
+Tare takes no fees today; the contracts are fee-free. The plan, strongest first:
+
+| Stream | How | Why it fits |
+|---|---|---|
+| Autopilot performance fee | 10% of the yield earned while a position is under Guardian protection, charged only on profit | Tare earns only when the user earns; protection is the product |
+| Routing and referral fees | Advisor deposits go through protocol referral and curator rev-share programs | No cost to the user |
+| Risk API | Jev verdicts and exit signals as a subscription for wallets, DAO treasuries and protocols listing vaults | Same engine, recurring B2B revenue |
+| Launchpad fee | 0.5-1% on bonding-curve trades, plus a share of reserve yield | Launch already ships |
+
+Illustrative size: 2% of the $1.35B tracked on Monad under Autopilot at a ~6% average APY is about $160k a year in performance fees, before routing, API and launch revenue.
 
 ## Run it yourself in 2 minutes (no keys)
 
