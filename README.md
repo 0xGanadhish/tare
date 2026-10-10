@@ -14,7 +14,7 @@ Tare reads every yield on Monad, uses Jev (TypeSafe's System One model) to judge
 | Read-only data and mirrored deploy | Monad Mainnet (chain 143) |
 | Repo | https://github.com/0xGanadhish/tare |
 
-All deposits, exits and launches are real transactions on Monad Testnet. Mainnet is used only for market data and wallet scans, plus a mirrored contract deploy (table below, TODO).
+All deposits, exits and launches are real transactions on Monad Testnet. Mainnet is used only for market data and wallet scans, plus a mirrored, source-verified contract deploy (table below).
 
 ## Deployed contracts
 
@@ -32,11 +32,18 @@ All deposits, exits and launches are real transactions on Monad Testnet. Mainnet
 
 Each MirrorVault is an ERC-4626 vault over MockUSDC that mirrors the named real Monad vault's APY, with adjustable utilization so exit risk is real and demonstrable. Seeded with 40,000 USDC each.
 
-### Monad Mainnet (chain 143)
+### Monad Mainnet (chain 143), source verified
+
+The same contracts, deployed from the same operator, so the addresses match testnet. On mainnet the demo token is named `tareUSD` so it can never be mistaken for real USDC. The app's user transactions stay on testnet.
 
 | Contract | Address | Explorer |
 |---|---|---|
-| TODO | TODO | TODO |
+| Tare Demo USD (tareUSD, 6 decimals, demo token) | `0xd535a4068265b383976d92718e3E650b5183b6Ab` | [MonadVision](https://monadvision.com/address/0xd535a4068265b383976d92718e3e650b5183b6ab) · [Monadscan](https://monadscan.com/address/0xd535a4068265b383976d92718e3e650b5183b6ab) |
+| Guardian (keeper-gated auto-exit) | `0x0F22A6b6E5FB8bda0e85e5034DEaC069c8d5e8DF` | [MonadVision](https://monadvision.com/address/0x0f22a6b6e5fb8bda0e85e5034deac069c8d5e8df) · [Monadscan](https://monadscan.com/address/0x0f22a6b6e5fb8bda0e85e5034deac069c8d5e8df) |
+| MirrorVault: Clearstar USDC · Euler | `0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC` | [MonadVision](https://monadvision.com/address/0x7504b078d1f2b90fb9fcaf3d22753311013ea0ac) · [Monadscan](https://monadscan.com/address/0x7504b078d1f2b90fb9fcaf3d22753311013ea0ac) |
+| MirrorVault: K3 Capital Earn · Euler | `0x7c1c54fD8ae0bEC3a9D15A60DF4F0777298F6609` | [MonadVision](https://monadvision.com/address/0x7c1c54fd8ae0bec3a9d15a60df4f0777298f6609) · [Monadscan](https://monadscan.com/address/0x7c1c54fd8ae0bec3a9d15a60df4f0777298f6609) |
+| MirrorVault: August USDC v2 · Morpho | `0x92b4e57F3DD6450C65a45d081D0e97d5f5f9aA43` | [MonadVision](https://monadvision.com/address/0x92b4e57f3dd6450c65a45d081d0e97d5f5f9aa43) · [Monadscan](https://monadscan.com/address/0x92b4e57f3dd6450c65a45d081d0e97d5f5f9aa43) |
+| MirrorVault: Anemoy Apollo Credit · Centrifuge | `0x0c12De3767B22573b96510aCf67B5D298990B227` | [MonadVision](https://monadvision.com/address/0x0c12de3767b22573b96510acf67b5d298990b227) · [Monadscan](https://monadscan.com/address/0x0c12de3767b22573b96510acf67b5d298990b227) |
 
 ## What it does
 
