@@ -1,0 +1,8 @@
+{
+  "mirrors": [
+    { "name": "Mirror Clearstar USDC", "symbol": "mCLR", "mirrorOf": "Clearstar USDC · Euler", "poolId": "d711af54-e736-470f-8a22-431a23de76df", "apyBps": 656, "utilizationBps": 7100 },
+    { "name": "Mirror K3 Capital", "symbol": "mK3", "mirrorOf": "K3 Capital Earn · Euler", "poolId": "f234d4dc-9b36-4b23-b1ad-ab73e8286b56", "apyBps": 363, "utilizationBps": 7100 },
+    { "name": "Mirror August USDC", "symbol": "mAUG", "mirrorOf": "August USDC v2 · Morpho", "poolId": "0b033747-3a22-486b-a600-9958b878bef7", "apyBps": 841, "utilizationBps": 7100 },
+    { "name": "Mirror Anemoy Apollo", "symbol": "mANM", "mirrorOf": "Anemoy Apollo Credit · Centrifuge", "poolId": "e259a7bc-d2b0-41e5-b12d-a3c7b984560c", "apyBps": 197, "utilizationBps": 7100 }
+  ]
+}

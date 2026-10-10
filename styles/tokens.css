@@ -1,0 +1,71 @@
+/* Tare design tokens — "Field" direction (spec §5). */
+:root {
+  --bg: #f6f5f1;
+  --ink: #16151a;
+  --secondary: #6b6974;
+  --muted: #8b8894;
+  --faint: #a9a6b0;
+  --soft: #9c99a6;
+  --hairline: #e6e4de;
+  --deposit: #6e54f5;
+  --avoid: #e2552c;
+  --consider: #b9b6c3;
+  --paper: #fffefb;
+  --pre-scan: #cfccd6;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-ink: var(--ink);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-soft: var(--soft);
+  --color-hairline: var(--hairline);
+  --color-deposit: var(--deposit);
+  --color-avoid: var(--avoid);
+  --color-consider: var(--consider);
+  --color-paper: var(--paper);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Headings: Geist 500, tight tracking. */
+.display {
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+.mono {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+::selection {
+  background: var(--deposit);
+  color: #fff;
+}
+
+/* Weigh-in (spec §5): before JS drives the animation the dots start as hidden grey rings.
+   Reduced-motion users never get this class' effect, so they see the final state at once. */
+@media (prefers-reduced-motion: no-preference) {
+  .field-pre .dot {
+    opacity: 0;
+    fill: none;
+    stroke: var(--pre-scan);
+  }
+  .field-pre .field-note {
+    opacity: 0;
+  }
+}
+.field-note {
+  transition: opacity 0.6s;
+}
