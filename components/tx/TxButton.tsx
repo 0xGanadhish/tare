@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { injected, useAccount, useChainId, useConnect, useSwitchChain } from 'wagmi';
 import { monadTestnet } from '@/shared/chains';
 import { Button, type ButtonProps } from '@/components/ui/Button';
@@ -29,7 +30,21 @@ export function TxButton({ label, run, disabled, onConfirmed, variant, size, cla
   const chainId = useChainId();
   const { connect } = useConnect();
   const { switchChain } = useSwitchChain();
-  const { state, run: runTx } = useTx({ onConfirmed });
+  const { state, run: runTx, reset } = useTx({ onConfirmed });
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Popover only: a finished status fades after a few seconds (failures stay until dismissed);
+  // a click outside or Escape closes it at any time once nothing is in flight.
+  const settled = state.status === 'confirmed' || state.status === 'cancelled' || state.status === 'failed';
+  useEffect(() => {
+    if (!popover || !settled) return;
+    const timer = state.status === 'failed' ? undefined : setTimeout(reset, 4000);
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) reset(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') reset(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { clearTimeout(timer); document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [popover, settled, state.status, reset]);
 
   const busy = state.status === 'awaiting_signature' || state.status === 'pending';
   const needsConnect = !isConnected;
@@ -52,7 +67,7 @@ export function TxButton({ label, run, disabled, onConfirmed, variant, size, cla
   };
 
   return (
-    <div className={`relative ${popover ? 'inline-block' : ''} ${className ?? ''}`}>
+    <div ref={ref} className={`relative ${popover ? 'inline-block' : ''} ${className ?? ''}`}>
       <Button variant={variant} size={size} onClick={onClick} disabled={busy || (disabled && !needsConnect && !needsSwitch)} className={popover ? '' : 'w-full sm:w-auto'}>
         {text}
       </Button>
