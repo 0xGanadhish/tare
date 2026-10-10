@@ -8,7 +8,7 @@ Tare reads every yield on Monad, uses Jev (TypeSafe's System One model) to judge
 
 ## Live
 
-| | |
+| What | Where |
 |---|---|
 | Live app | https://tarefi.xyz |
 | Hosting | Vercel (custom domain, HTTPS) |
