@@ -22,6 +22,7 @@ const enabledEvent = parseAbiItem('event Enabled(address indexed owner, address 
 const disabledEvent = parseAbiItem('event Disabled(address indexed owner, address indexed vault)');
 
 const CHUNK = 100n; // the public RPC caps getLogs ranges
+const MAX_CATCHUP_CHUNKS = 20n; // per tick, so a backlog drains in a few seconds
 const CONCURRENCY = 8;
 
 interface WorkerState { guardian: Address; lastBlock: string; enabled: Enabled[] }
@@ -117,16 +118,31 @@ async function main() {
   }
   await replayEnabled(fromBlock).catch((e) => log('enabled replay failed', e instanceof Error ? e.message.split('\n').slice(0, 4).join(' | ') : e));
 
+  const readStatsChunk = (fromBlock: bigint, toBlock: bigint) =>
+    publicClient.getLogs({ address: vaults, event: statsEvent, fromBlock, toBlock });
+
   const wd = createWatchdog({
     async readStats() {
       const head = await publicClient.getBlockNumber();
       if (head <= fromBlock) return [];
-      const from = fromBlock + 1n;
-      const logs = await publicClient.getLogs({ address: vaults, event: statsEvent, fromBlock: from, toBlock: head });
+      // The public RPC rejects getLogs ranges over 100 blocks. Read in chunks and never ask for
+      // more than MAX_CATCHUP_CHUNKS per tick, so one failed tick can't snowball into a range
+      // that fails forever; fromBlock only advances past chunks that were read.
+      const to = head - fromBlock > CHUNK * MAX_CATCHUP_CHUNKS ? fromBlock + CHUNK * MAX_CATCHUP_CHUNKS : head;
+      const logs: Awaited<ReturnType<typeof readStatsChunk>> = [];
+      for (let start = fromBlock + 1n; start <= to; start += CHUNK) {
+        const end = start + CHUNK - 1n < to ? start + CHUNK - 1n : to;
+        try {
+          logs.push(...(await readStatsChunk(start, end)));
+        } catch (e) {
+          if (logs.length === 0) throw e; // nothing to lose; report the failure
+          break; // keep what was read; the next tick resumes at this chunk
+        }
+        fromBlock = end;
+      }
       const before = enabledSet.size;
-      await replayEnabled(head);
+      await replayEnabled(fromBlock);
       if (enabledSet.size !== before) saveState(true);
-      fromBlock = head;
       return logs
         .sort((a, b) => Number(a.blockNumber! - b.blockNumber!) || (a.logIndex! - b.logIndex!))
         .map((l) => ({ vault: l.address as Address, apyBps: Number(l.args.apyBps), utilBps: Number(l.args.utilizationBps) }));
