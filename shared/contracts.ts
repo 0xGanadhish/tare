@@ -69,6 +69,8 @@ export const abis = {
   launchFactory: parseAbi([
     'function guardian() view returns (address)',
     'function create(string name, string symbol, address reserveVault) returns (address)',
+    'function launches() view returns ((address token, address creator, address reserveVault, string name, string symbol)[])',
+    'function launchCount() view returns (uint256)',
     'event TokenCreated(address indexed token, address indexed creator, address reserveVault, string name, string symbol)',
     'error VaultNotApproved()',
   ]),

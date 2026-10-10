@@ -91,6 +91,18 @@ contract LaunchTest is Test {
         assertEq(token.balanceOf(alice), 0);
     }
 
+    function test_launchesListsEveryToken() public {
+        address second = factory.create("Second", "TWO", address(vault));
+        LaunchFactory.Launch[] memory all = factory.launches();
+        assertEq(all.length, 2);
+        assertEq(factory.launchCount(), 2);
+        assertEq(all[0].token, address(token));
+        assertEq(all[1].token, second);
+        assertEq(all[1].creator, address(this));
+        assertEq(all[1].reserveVault, address(vault));
+        assertEq(all[1].symbol, "TWO");
+    }
+
     function test_createRejectsUnapprovedVault() public {
         vm.expectRevert(LaunchFactory.VaultNotApproved.selector);
         factory.create("Rejected", "NO", address(0xDEAD));
