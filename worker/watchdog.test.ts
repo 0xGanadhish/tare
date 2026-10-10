@@ -36,6 +36,15 @@ describe('watchdog', () => {
     expect(types()).toEqual(['stats_changed', 'judged', 'exit_sent', 'exit_confirmed']);
   });
 
+  test('judged events carry the full PositionJudgment', async () => {
+    const j = { ...judgment('exit', 0.95), withdrawalRisk: 0.8123456, yieldCollapse: 0.7654321 };
+    const { wd, events } = setup({ judge: vi.fn(async () => j) }, [[{ apyBps: 90, utilBps: 9200 }]]);
+    await wd.tick();
+    const e = events.find((x) => x.type === 'judged')!;
+    expect(e.judgment).toEqual(j);
+    expect(e.message).toContain('Jev:');
+  });
+
   test('alerts instead of exiting when confidence is 0.75', async () => {
     const { wd, deps, types } = setup({ judge: vi.fn(async () => judgment('exit', 0.75)) }, [[{ apyBps: 90, utilBps: 9200 }]]);
     await wd.tick();

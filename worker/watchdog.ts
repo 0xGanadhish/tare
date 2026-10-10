@@ -62,7 +62,7 @@ export function createWatchdog(deps: WatchdogDeps) {
       return;
     }
     judged.set(vault, stats);
-    await emit({ vault, type: 'judged', confidence: j.action.confidence,
+    await emit({ vault, type: 'judged', confidence: j.action.confidence, judgment: j,
       message: `Jev: ${j.action.value} (${Math.round(j.action.confidence * 100)}%) · withdrawal risk ${j.withdrawalRisk.toFixed(2)} · yield collapse ${j.yieldCollapse.toFixed(2)}` });
 
     const alertMsg = `Jev suggests exit (${Math.round(j.action.confidence * 100)}%)`;
