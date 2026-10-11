@@ -5,6 +5,7 @@ import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { addresses, abis } from '@/shared/contracts';
 import { monadTestnet } from '@/shared/chains';
 import { TxButton } from '@/components/tx/TxButton';
+import { useNetwork } from '@/components/network/NetworkProvider';
 
 const MINT_AMOUNT = 1_000_000_000n; // 1,000 USDC (6 decimals)
 
@@ -22,8 +23,14 @@ export function useUsdcBalance() {
   });
 }
 
-/** "Get test USDC": mints 1,000 MockUSDC to the connected wallet. Hidden until the token is deployed and a wallet is connected. */
+/** "Get test USDC": mints 1,000 MockUSDC to the connected wallet. Testnet only; hidden until the token is deployed and a wallet is connected. */
 export function FaucetButton() {
+  const { config } = useNetwork();
+  if (!config.features.faucet) return null;
+  return <Faucet />;
+}
+
+function Faucet() {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const { data: balance } = useUsdcBalance();
@@ -43,6 +50,7 @@ export function FaucetButton() {
         size="sm"
         variant="secondary"
         label="Get test USDC"
+        chainId={monadTestnet.id}
         run={() =>
           writeContractAsync({
             address: token,

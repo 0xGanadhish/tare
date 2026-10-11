@@ -5,9 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { VerdictSlip } from '@/components/slip/VerdictSlip';
 import { Button } from '@/components/ui/Button';
 import { formatPct } from '@/components/field/format';
-import { addresses } from '@/shared/contracts';
 import type { Intent, Recommendation } from '@/shared/types';
-import { DepositFlow } from './DepositFlow';
+import { SlipAction } from '@/components/slip/SlipAction';
 import { IntentChips, needsPick } from './IntentChips';
 
 const EXAMPLE = '500 USDC, safe, 3 months';
@@ -154,11 +153,7 @@ export function AdvisorClient() {
                       {r.expectedReturnUsd > 0 && <>≈ ${Math.round(r.expectedReturnUsd).toLocaleString('en-US')} over your horizon at {formatPct(r.realApy, 2)} real APY. </>}
                       {r.fitReasons.join(' · ')}
                     </p>
-                    {r.mirrorVault ? (
-                      <DepositFlow vault={r.mirrorVault} mirrorOf={mirrorLabel(r)} defaultAmount={intent?.amount} />
-                    ) : (
-                      <p className="mono text-[11.5px] text-muted">No testnet mirror for this pool.</p>
-                    )}
+                    <SlipAction pool={r.pool} defaultAmount={intent?.amount} />
                   </div>
                 }
               />
@@ -168,8 +163,4 @@ export function AdvisorClient() {
       )}
     </div>
   );
-}
-
-function mirrorLabel(r: Recommendation): string {
-  return addresses.mirrors?.find((m) => m.address.toLowerCase() === r.mirrorVault?.toLowerCase())?.mirrorOf ?? `${r.pool.symbol} · ${r.pool.project}`;
 }

@@ -73,7 +73,7 @@ function Launch({ factory }: { factory: Address }) {
             <p className="text-xs leading-relaxed text-secondary">Testnet mirror · {mirrors.find((mirror) => mirror.address === reserve)?.mirrorOf ?? 'No reserve available'}. Yield is simulated; wallet transactions are real.</p>
             {pools.isError && <p className="text-xs text-secondary">Jev recommendations are unavailable. Choose a reserve manually.</p>}
             {!pools.isPending && !pools.isError && !recommended && <p className="text-xs text-secondary">No Jev deposit recommendation for these reserves yet.</p>}
-            <TxButton label="Create token" disabled={!valid} run={() => {
+            <TxButton label="Create token" chainId={10143} disabled={!valid} run={() => {
               if (!reserve || !valid) throw new Error('Enter a name, symbol, and reserve vault');
               return writeContractAsync({ address: factory, abi: abis.launchFactory, functionName: 'create', args: [name.trim(), symbol.trim(), reserve], chainId: 10143 });
             }} />

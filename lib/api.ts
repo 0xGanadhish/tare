@@ -2,7 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readPools, readVerdicts } from '../shared/cache';
 import type { Intent, Pool, Verdict } from '../shared/types';
+import { BackendUnavailable, serverBackend } from './backend';
 
+/** Market data: fixtures when offline or DATA_SOURCE=fixtures, else the backend (BACKEND_URL), else the worker cache, else fixtures. */
 export async function readMarket(): Promise<{ pools: Pool[]; verdicts: Record<string, Verdict>; asOf: string }> {
   if (process.env.OFFLINE === '1') {
     const dir = process.env.FIXTURES_DIR ?? join(process.cwd(), 'fixtures');
@@ -10,6 +12,17 @@ export async function readMarket(): Promise<{ pools: Pool[]; verdicts: Record<st
       readFile(join(dir, 'pools.json'), 'utf8'), readFile(join(dir, 'verdicts.json'), 'utf8'),
     ]);
     return { ...JSON.parse(pools), verdicts: JSON.parse(verdicts) };
+  }
+  const backend = process.env.DATA_SOURCE === 'fixtures' ? null : serverBackend();
+  if (backend) {
+    try {
+      const market = await backend.pools();
+      // An empty backend (before its first pool scan) has no asOf: fall through to the cache.
+      if (market.asOf) return { pools: market.pools, verdicts: market.verdicts, asOf: market.asOf };
+    } catch (err) {
+      if (!(err instanceof BackendUnavailable)) throw err;
+      console.warn(err.message);
+    }
   }
   const [market, verdicts] = await Promise.all([readPools(), readVerdicts()]);
   return { ...market, verdicts };

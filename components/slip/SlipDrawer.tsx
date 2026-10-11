@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Pool, Verdict } from '@/shared/types';
 import { VerdictSlip } from './VerdictSlip';
+import { SlipAction } from './SlipAction';
 
 type History = { t: string; apy: number; tvlUsd: number }[];
 
@@ -49,7 +50,7 @@ export function SlipDrawer({ pool, verdict, onClose }: SlipDrawerProps) {
             Close ✕
           </button>
         </div>
-        <VerdictSlip pool={pool} verdict={verdict} history={history?.id === pool.id ? history.rows : undefined} />
+        <VerdictSlip pool={pool} verdict={verdict} history={history?.id === pool.id ? history.rows : undefined} action={<SlipAction pool={pool} />} />
       </div>
     </div>
   );

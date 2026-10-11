@@ -1,59 +1,72 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import type { PositionJudgment } from '../shared/types';
-import type * as Viem from 'viem';
-import type * as Contracts from '../shared/contracts';
-
-const state = vi.hoisted(() => ({
-  addresses: {} as { mirrors?: { address: `0x${string}`; mirrorOf: string; poolId: null }[]; guardian?: `0x${string}` },
-  readContract: vi.fn(), readEvents: vi.fn(),
-}));
-vi.mock('viem', async (original) => ({ ...await original<typeof Viem>(), createPublicClient: () => ({ readContract: state.readContract }) }));
-vi.mock('../shared/contracts', async (original) => ({ ...await original<typeof Contracts>(), addresses: state.addresses }));
-vi.mock('../shared/cache', () => ({ readEvents: state.readEvents }));
-import { readPositions } from './positions';
+import { beforeEach, expect, test, vi } from 'vitest';
+import { NETWORKS, UNDEPLOYED, type NetworkConfig, type VaultConfig } from '../shared/networks';
+import { readPositions, type PositionDeps } from './positions';
 
 const owner = '0x1111111111111111111111111111111111111111';
-const vault = '0x2222222222222222222222222222222222222222';
+const vaultA: VaultConfig = { address: '0x2222222222222222222222222222222222222222', name: 'Vault A', poolId: 'a', protocol: 'euler', adapter: null };
+const vaultB: VaultConfig = { address: '0x4444444444444444444444444444444444444444', name: 'Vault B', poolId: 'b', protocol: 'morpho', adapter: null };
 const guardian = '0x3333333333333333333333333333333333333333';
-const judgment: PositionJudgment = { action: { value: 'exit', confidence: 0.93 }, withdrawalRisk: 0.92, yieldCollapse: 0.8, statsHash: 'jev-stats-hash', at: '2026-10-10T01:00:00Z' };
-beforeEach(() => {
-  state.addresses.mirrors = [{ address: vault, mirrorOf: 'Test mirror', poolId: null }];
-  state.addresses.guardian = guardian;
-  state.readEvents.mockResolvedValue([]);
-  state.readContract.mockImplementation(async ({ functionName }: { functionName: string }) => {
-    return { balanceOf: 9007199254740993123n, convertToAssets: 9999999999999999999n,
-      apyBps: 630, utilizationBps: 7100, enabled: true }[functionName];
-  });
-});
-afterEach(() => vi.clearAllMocks());
+const oracle = '0x5555555555555555555555555555555555555555';
+const stateHash = `0x${'ab'.repeat(32)}` as const;
+const txHash = `0x${'cd'.repeat(32)}` as const;
 
-test.each(['vitalik.eth', '1111111111111111111111111111111111111111', '0x123'])('rejects invalid owner %s before any RPC', async (address) => {
-  await expect(readPositions(address as `0x${string}`)).rejects.toThrow('Not a valid Monad address');
-  expect(state.readContract).not.toHaveBeenCalled();
+const config = (over: Partial<NetworkConfig> = {}): NetworkConfig => ({ ...NETWORKS.testnet, vaults: [vaultA, vaultB], guardian, oracle, ...over });
+
+let readContract: ReturnType<typeof vi.fn>;
+let latest: ReturnType<typeof vi.fn>;
+let deps: PositionDeps;
+
+beforeEach(() => {
+  readContract = vi.fn(async ({ address, functionName }: { address: string; functionName: string }) => {
+    if (functionName === 'balanceOf') return address === vaultA.address ? 5_000_000n : 0n;
+    if (functionName === 'convertToAssets') return 5_100_000n;
+    if (functionName === 'rules') return [true, 9000, 600, 1_760_000_000n];
+    if (functionName === 'latest') return 7n;
+    if (functionName === 'getPost') return { vault: vaultA.address, verdict: 1, confidenceBps: 9300, riskBps: 8800, stateHash, postedAt: 1_760_000_100n, ppsAtPost: 0n, assetsAtPost: 0n, liquidityAtPost: 0n };
+    throw new Error(`unexpected ${functionName}`);
+  });
+  latest = vi.fn(async () => ({ id: 7, txHash }));
+  deps = { config: config(), client: { readContract } as unknown as PositionDeps['client'], backend: { latest } as unknown as PositionDeps['backend'], stateBaseUrl: 'https://state.example' };
 });
-test('empty deployment produces no positions without touching RPC', async () => {
-  delete state.addresses.mirrors;
-  delete state.addresses.guardian;
-  expect(await readPositions(owner)).toEqual([]);
-  expect(state.readContract).not.toHaveBeenCalled();
+
+test('rejects an invalid owner before any RPC', async () => {
+  await expect(readPositions('testnet', '0x123' as `0x${string}`, deps)).rejects.toThrow('Not a valid Monad address');
+  expect(readContract).not.toHaveBeenCalled();
 });
-test('keeps exact chain quantities and latest complete judgment for this owner/vault', async () => {
-  state.readEvents.mockResolvedValue([
-    { id: 'old', type: 'judged', vault, at: '2026-10-10T00:00:00Z', judgment: { ...judgment, action: { value: 'hold', confidence: 0.7 } } },
-    { id: 'new', type: 'judged', vault: vault.toUpperCase(), owner, at: judgment.at, judgment },
-    { id: 'other-owner', type: 'judged', vault, owner: guardian, at: '2026-10-10T02:00:00Z', judgment: { ...judgment, action: { value: 'rotate', confidence: 0.8 } } },
-  ]);
-  expect(await readPositions(owner)).toEqual([{ vault, mirrorOf: 'Test mirror', shares: '9007199254740993123',
-    assets: '9999999999999999999', apyBps: 630, utilBps: 7100, autopilot: true, judgment }]);
-  expect(state.readContract).toHaveBeenCalledWith(expect.objectContaining({ address: guardian, functionName: 'enabled', args: [owner, vault] }));
+
+test('readPositions skips vaults with zero shares', async () => {
+  const positions = await readPositions('testnet', owner, deps);
+  expect(positions.map((p) => p.vault.address)).toEqual([vaultA.address]);
 });
-test('zero-share vaults are excluded from positions', async () => {
-  state.readContract.mockResolvedValue(0n);
-  expect(await readPositions(owner)).toEqual([]);
+
+test('readPositions attaches the rule and latest verdict', async () => {
+  const [p] = await readPositions('testnet', owner, deps);
+  expect(p).toEqual({
+    vault: vaultA, shares: 5_000_000n, assets: 5_100_000n,
+    rule: { enabled: true, minConfidenceBps: 9000, maxAge: 600 },
+    latest: { id: '7', verdict: 'EXIT', confidenceBps: 9300, postedAt: 1_760_000_100, txHash, stateUrl: `https://state.example/state/${stateHash}.json` },
+  });
+  expect(readContract).toHaveBeenCalledWith(expect.objectContaining({ address: guardian, functionName: 'rules', args: [owner, vaultA.address] }));
 });
-test('missing Guardian disables autopilot; message-only judgments remain unknown', async () => {
-  delete state.addresses.guardian;
-  state.readEvents.mockResolvedValue([{ type: 'judged', vault, at: judgment.at, confidence: 0.93,
-    message: 'Jev: exit (93%) · withdrawal risk 0.92 · yield collapse 0.80' }]);
-  expect((await readPositions(owner))[0]).toMatchObject({ autopilot: false, judgment: null });
+
+test('no Guardian or oracle deployed → rule and latest are null, no calls to them', async () => {
+  deps.config = config({ guardian: UNDEPLOYED, oracle: UNDEPLOYED });
+  const [p] = await readPositions('testnet', owner, deps);
+  expect(p.rule).toBeNull();
+  expect(p.latest).toBeNull();
+  expect(readContract.mock.calls.map(([c]) => c.functionName)).not.toContain('rules');
+});
+
+test('a vault with no post yet has latest null', async () => {
+  readContract.mockImplementation(async ({ address, functionName }: { address: string; functionName: string }) =>
+    ({ balanceOf: address === vaultA.address ? 1n : 0n, convertToAssets: 1n, rules: [false, 0, 0, 0n], latest: 0n } as Record<string, unknown>)[functionName]);
+  const [p] = await readPositions('testnet', owner, deps);
+  expect(p.latest).toBeNull();
+  expect(p.rule).toEqual({ enabled: false, minConfidenceBps: 0, maxAge: 0 });
+});
+
+test('backend down still returns the onchain verdict, without a tx hash', async () => {
+  latest.mockRejectedValue(new Error('down'));
+  const [p] = await readPositions('testnet', owner, deps);
+  expect(p.latest).toMatchObject({ id: '7', verdict: 'EXIT', txHash: null });
 });
