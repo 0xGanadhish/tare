@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({ readPools: vi.fn(), readVerdicts: vi.fn(), rea
 vi.mock('../../shared/cache', () => ({ readPools: mocks.readPools, readVerdicts: mocks.readVerdicts, readEvents: mocks.readEvents }));
 vi.mock('../../shared/contracts', () => ({ addresses: mocks.addresses }));
 vi.mock('../../lib/idle', () => ({ scanAddress: mocks.scan }));
-vi.mock('../../lib/positions', () => ({ readPositions: mocks.positions }));
+vi.mock('../../lib/positions', async (original) => ({ ...await original<typeof import('../../lib/positions')>(), readPositions: mocks.positions }));
 vi.mock('../../worker/operator', () => ({ sendSetStats: mocks.sendSetStats }));
 
 const owner = '0x1111111111111111111111111111111111111111';
@@ -67,6 +67,19 @@ test('empty deployment returns empty position shape', async () => {
   mocks.positions.mockResolvedValueOnce([]);
   const response = await positionsGET(new Request(`http://x/api/positions/${owner}`), { params: Promise.resolve({ address: owner }) });
   expect(await response.json()).toEqual({ positions: [] });
+  expect(mocks.positions).toHaveBeenCalledWith('testnet', owner);
+});
+test('positions read the network from ?network= and reject unknown networks', async () => {
+  mocks.positions.mockResolvedValueOnce([]);
+  await positionsGET(new Request(`http://x/api/positions/${owner}?network=mainnet`), { params: Promise.resolve({ address: owner }) });
+  expect(mocks.positions).toHaveBeenCalledWith('mainnet', owner);
+  const bad = await positionsGET(new Request(`http://x/api/positions/${owner}?network=foo`), { params: Promise.resolve({ address: owner }) });
+  expect(bad.status).toBe(400);
+});
+test('positions serialize bigints as strings', async () => {
+  mocks.positions.mockResolvedValueOnce([{ vault: { address: vault }, shares: 5n, assets: 6n, rule: null, latest: null }]);
+  const response = await positionsGET(new Request(`http://x/api/positions/${owner}`), { params: Promise.resolve({ address: owner }) });
+  expect(await response.json()).toEqual({ positions: [{ vault: { address: vault }, shares: '5', assets: '6', rule: null, latest: null }] });
 });
 test('pool filters intersect asset and protocol, preserving asOf and matching verdicts', async () => {
   const response = await poolsGET(new Request('http://x/api/pools?asset=gold&protocol=gold-project'));
