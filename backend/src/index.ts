@@ -14,4 +14,4 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 export class VaultWatcher {}
-export class TxSender {}
+export { TxSender } from "./txSender";
