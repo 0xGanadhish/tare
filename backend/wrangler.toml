@@ -7,7 +7,8 @@ compatibility_flags = ["nodejs_compat"]
 enabled = true
 
 [triggers]
-crons = ["*/10 * * * *", "*/5 * * * *"]
+# Pool scan every 10 min; resolver every minute (see CRON_* in src/index.ts).
+crons = ["*/10 * * * *", "* * * * *"]
 
 [[d1_databases]]
 binding = "DB"
