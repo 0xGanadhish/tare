@@ -1,9 +1,12 @@
 import { describe, it } from 'vitest';
 import { createTestIndexer } from 'generated';
 import { TestHelpers } from 'envio';
+import { START_BLOCKS } from '../src/startBlocks';
 
 const { Addresses } = TestHelpers;
 const CHAIN = 10143;
+// Test blocks are offsets from the generated start block (the real deploy block once DeployV2 has run).
+const B0 = START_BLOCKS[CHAIN]!;
 type Hex = `0x${string}`;
 const VAULT: Hex = '0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC';
 const OWNER = Addresses.mockAddresses[0]!;
@@ -15,7 +18,7 @@ const HOUR = 1_760_000_400; // a UTC hour boundary (divisible by 3600)
 const post = (id: bigint, verdict = 1n, block = 100) => ({
   contract: 'TareRiskOracle' as const,
   event: 'VerdictPosted' as const,
-  block: { number: block, timestamp: HOUR },
+  block: { number: B0 + block, timestamp: HOUR },
   transaction: { hash: TX },
   params: { id, vault: VAULT, verdict, confidenceBps: 9500n, riskBps: 300n, stateHash: STATE_HASH, postedAt: BigInt(HOUR) },
 });
@@ -24,7 +27,7 @@ const withdraw = (assets: bigint, timestamp: number, block: number) => ({
   contract: 'ERC4626Vault' as const,
   event: 'Withdraw' as const,
   srcAddress: VAULT,
-  block: { number: block, timestamp },
+  block: { number: B0 + block, timestamp },
   transaction: { hash: `0x${block.toString(16).padStart(64, '0')}` as Hex },
   params: { sender: OWNER, receiver: OWNER, owner: OWNER, assets, shares: assets },
 });
@@ -33,7 +36,7 @@ const deposit = (assets: bigint, timestamp: number, block: number) => ({
   contract: 'ERC4626Vault' as const,
   event: 'Deposit' as const,
   srcAddress: VAULT,
-  block: { number: block, timestamp },
+  block: { number: B0 + block, timestamp },
   transaction: { hash: `0x${block.toString(16).padStart(64, '0')}` as Hex },
   params: { sender: OWNER, owner: OWNER, assets, shares: assets },
 });
@@ -77,7 +80,7 @@ describe('TareRiskOracle', () => {
             {
               contract: 'TareRiskOracle',
               event: 'VerdictResolved',
-              block: { number: 200, timestamp: HOUR + 3700 },
+              block: { number: B0 + 200, timestamp: HOUR + 3700 },
               params: { id: 7n, adverse: true, reasons: 5n },
             },
           ],
@@ -105,7 +108,7 @@ describe('GuardianV2', () => {
             {
               contract: 'GuardianV2',
               event: 'Enabled',
-              block: { number: 100, timestamp: HOUR },
+              block: { number: B0 + 100, timestamp: HOUR },
               params: { owner: OWNER, vault: VAULT, minConfidenceBps: 9000n, maxAge: 600n },
             },
           ],
@@ -130,7 +133,7 @@ describe('GuardianV2', () => {
             {
               contract: 'GuardianV2',
               event: 'Disabled',
-              block: { number: 101, timestamp: HOUR + 60 },
+              block: { number: B0 + 101, timestamp: HOUR + 60 },
               params: { owner: OWNER, vault: VAULT },
             },
           ],
@@ -156,7 +159,7 @@ describe('GuardianV2', () => {
             {
               contract: 'GuardianV2',
               event: 'Exited',
-              block: { number: 101, timestamp: HOUR + 5 },
+              block: { number: B0 + 101, timestamp: HOUR + 5 },
               transaction: { hash: exitTx },
               logIndex: 3,
               params: {

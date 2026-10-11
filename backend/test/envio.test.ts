@@ -2,6 +2,10 @@ import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { readFlows, readProtections, type EnvioDeps, type GuardianLog } from '../src/envio';
 
+import { NETWORKS } from '../../shared/networks';
+
+// Real deploy block once DeployV2 has run; the getLogs fallback starts there.
+const D = NETWORKS.testnet.deployBlock;
 const VAULT = '0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC' as const;
 const A = '0x00000000000000000000000000000000000000a1';
 const B = '0x00000000000000000000000000000000000000b2';
@@ -72,18 +76,18 @@ describe('readProtections', () => {
 
   it('readProtections: Envio down → getLogs fallback returns the enabled owners', async () => {
     const logs: GuardianLog[] = [
-      { kind: 'enabled', owner: A, vault: VAULT, minConfidenceBps: 9000, blockNumber: 10n, logIndex: 0 },
-      { kind: 'enabled', owner: B, vault: VAULT, minConfidenceBps: 8500, blockNumber: 11n, logIndex: 0 },
-      { kind: 'disabled', owner: B, vault: VAULT, minConfidenceBps: 0, blockNumber: 12n, logIndex: 1 },
-      { kind: 'enabled', owner: A, vault: VAULT, minConfidenceBps: 9500, blockNumber: 150n, logIndex: 0 }, // rule updated
+      { kind: 'enabled', owner: A, vault: VAULT, minConfidenceBps: 9000, blockNumber: D + 10n, logIndex: 0 },
+      { kind: 'enabled', owner: B, vault: VAULT, minConfidenceBps: 8500, blockNumber: D + 11n, logIndex: 0 },
+      { kind: 'disabled', owner: B, vault: VAULT, minConfidenceBps: 0, blockNumber: D + 12n, logIndex: 1 },
+      { kind: 'enabled', owner: A, vault: VAULT, minConfidenceBps: 9500, blockNumber: D + 150n, logIndex: 0 }, // rule updated
     ];
     const ranges: [bigint, bigint][] = [];
     const fallback = deps({
-      getBlockNumber: async () => 250n,
+      getBlockNumber: async () => D + 250n,
       getGuardianLogs: async (_n, from, to) => { ranges.push([from, to]); return logs.filter((l) => l.blockNumber >= from && l.blockNumber <= to); },
     });
     expect(await readProtections(env.DB, fallback, 'testnet', VAULT)).toEqual([{ owner: A, minConfidenceBps: 9500 }]);
-    expect(ranges).toEqual([[0n, 99n], [100n, 199n], [200n, 250n]]); // 100-block chunks from the deploy block
+    expect(ranges).toEqual([[D, D + 99n], [D + 100n, D + 199n], [D + 200n, D + 250n]]); // 100-block chunks from the deploy block
     expect(await readProtections(env.DB, fallback, 'testnet', VAULT)).toEqual([{ owner: A, minConfidenceBps: 9500 }]);
     expect(ranges).toHaveLength(3); // already caught up: nothing re-read
   });
@@ -91,13 +95,13 @@ describe('readProtections', () => {
   it('readProtections: a failed chunk keeps what was read and resumes there', async () => {
     let fail = true;
     const fallback = deps({
-      getBlockNumber: async () => 250n,
+      getBlockNumber: async () => D + 250n,
       getGuardianLogs: async (_n, from) => {
-        if (from === 100n && fail) { fail = false; throw new Error('rpc'); }
-        return from === 0n ? [{ kind: 'enabled', owner: A, vault: VAULT, minConfidenceBps: 9000, blockNumber: 5n, logIndex: 0 }] : [];
+        if (from === D + 100n && fail) { fail = false; throw new Error('rpc'); }
+        return from === D ? [{ kind: 'enabled', owner: A, vault: VAULT, minConfidenceBps: 9000, blockNumber: D + 5n, logIndex: 0 }] : [];
       },
     });
     expect(await readProtections(env.DB, fallback, 'testnet', VAULT)).toEqual([{ owner: A, minConfidenceBps: 9000 }]);
-    expect(await env.DB.prepare(`SELECT block FROM log_cursors WHERE name = 'guardian'`).first('block')).toBe(99);
+    expect(await env.DB.prepare(`SELECT block FROM log_cursors WHERE name = 'guardian'`).first('block')).toBe(Number(D + 99n));
   });
 });
