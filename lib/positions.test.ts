@@ -20,6 +20,7 @@ beforeEach(() => {
   readContract = vi.fn(async ({ address, functionName }: { address: string; functionName: string }) => {
     if (functionName === 'balanceOf') return address === vaultA.address ? 5_000_000n : 0n;
     if (functionName === 'convertToAssets') return 5_100_000n;
+    if (functionName === 'maxRedeem') return 3_000_000n;
     if (functionName === 'rules') return [true, 9000, 600, 1_760_000_000n];
     if (functionName === 'latest') return 7n;
     if (functionName === 'getPost') return { vault: vaultA.address, verdict: 1, confidenceBps: 9300, riskBps: 8800, stateHash, postedAt: 1_760_000_100n, ppsAtPost: 0n, assetsAtPost: 0n, liquidityAtPost: 0n };
@@ -42,7 +43,7 @@ test('readPositions skips vaults with zero shares', async () => {
 test('readPositions attaches the rule and latest verdict', async () => {
   const [p] = await readPositions('testnet', owner, deps);
   expect(p).toEqual({
-    vault: vaultA, shares: 5_000_000n, assets: 5_100_000n,
+    vault: vaultA, shares: 5_000_000n, assets: 5_100_000n, redeemable: 3_000_000n,
     rule: { enabled: true, minConfidenceBps: 9000, maxAge: 600 },
     latest: { id: '7', verdict: 'EXIT', confidenceBps: 9300, postedAt: 1_760_000_100, txHash, stateUrl: `https://state.example/state/${stateHash}.json` },
   });
@@ -59,7 +60,7 @@ test('no Guardian or oracle deployed → rule and latest are null, no calls to t
 
 test('a vault with no post yet has latest null', async () => {
   readContract.mockImplementation(async ({ address, functionName }: { address: string; functionName: string }) =>
-    ({ balanceOf: address === vaultA.address ? 1n : 0n, convertToAssets: 1n, rules: [false, 0, 0, 0n], latest: 0n } as Record<string, unknown>)[functionName]);
+    ({ balanceOf: address === vaultA.address ? 1n : 0n, convertToAssets: 1n, maxRedeem: 1n, rules: [false, 0, 0, 0n], latest: 0n } as Record<string, unknown>)[functionName]);
   const [p] = await readPositions('testnet', owner, deps);
   expect(p.latest).toBeNull();
   expect(p.rule).toEqual({ enabled: false, minConfidenceBps: 0, maxAge: 0 });

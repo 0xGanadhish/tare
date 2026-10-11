@@ -11,7 +11,8 @@ import { slipAction } from './slipAction';
 export function SlipAction({ pool, defaultAmount }: { pool: Pool; defaultAmount?: number | null }) {
   const { network } = useNetwork();
   const action = slipAction(network, pool.id);
-  if (action.kind === 'deposit') return <DepositFlow vault={action.vault} defaultAmount={defaultAmount} />;
+  // Keyed by network and vault so step state (approved, deposited) never carries across a switch.
+  if (action.kind === 'deposit') return <DepositFlow key={`${network}:${action.vault.address}`} vault={action.vault} defaultAmount={defaultAmount} />;
   const url = protocolUrl(pool.project);
   return (
     <div>

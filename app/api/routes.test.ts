@@ -77,9 +77,9 @@ test('positions read the network from ?network= and reject unknown networks', as
   expect(bad.status).toBe(400);
 });
 test('positions serialize bigints as strings', async () => {
-  mocks.positions.mockResolvedValueOnce([{ vault: { address: vault }, shares: 5n, assets: 6n, rule: null, latest: null }]);
+  mocks.positions.mockResolvedValueOnce([{ vault: { address: vault }, shares: 5n, assets: 6n, redeemable: 5n, rule: null, latest: null }]);
   const response = await positionsGET(new Request(`http://x/api/positions/${owner}`), { params: Promise.resolve({ address: owner }) });
-  expect(await response.json()).toEqual({ positions: [{ vault: { address: vault }, shares: '5', assets: '6', rule: null, latest: null }] });
+  expect(await response.json()).toEqual({ positions: [{ vault: { address: vault }, shares: '5', assets: '6', redeemable: '5', rule: null, latest: null }] });
 });
 test('pool filters intersect asset and protocol, preserving asOf and matching verdicts', async () => {
   const response = await poolsGET(new Request('http://x/api/pools?asset=gold&protocol=gold-project'));

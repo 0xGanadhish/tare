@@ -6,13 +6,14 @@ import { NETWORKS, type Network, type VaultConfig } from '@/shared/networks';
 
 const wallet = vi.hoisted(() => ({ chainId: 10143 as number, address: '0x00000000000000000000000000000000000000a1' as `0x${string}` }));
 const net = vi.hoisted(() => ({ network: 'testnet' as Network }));
+const write = vi.hoisted(() => ({ fn: (() => new Promise(() => {})) as (...a: unknown[]) => Promise<unknown> }));
 
 vi.mock('wagmi', () => ({
   injected: () => ({}),
   useAccount: () => ({ address: wallet.address, isConnected: true, chainId: wallet.chainId }),
   useConnect: () => ({ connect: vi.fn() }),
   useSwitchChain: () => ({ switchChain: vi.fn(), switchChainAsync: vi.fn() }),
-  useWriteContract: () => ({ writeContractAsync: vi.fn() }),
+  useWriteContract: () => ({ writeContractAsync: (...a: unknown[]) => write.fn(...a) }),
   useConfig: () => ({}),
   useReadContract: ({ functionName }: { functionName: string }) => ({ data: functionName === 'allowance' ? 0n : 5_000_000_000n }),
   useReadContracts: () => ({ data: [] }),
@@ -86,4 +87,20 @@ describe('DepositFlow', () => {
     expect(screen.queryByRole('button', { name: /Switch to/ })).toBeNull();
     expect((screen.getByRole('button', { name: /Approve/ }) as HTMLButtonElement).disabled).toBe(false);
   });
+});
+
+test('flipping to the wrong chain and back mid-signature cannot send a second approve', () => {
+  net.network = 'testnet';
+  wallet.chainId = NETWORKS.testnet.chain.id;
+  const calls = vi.fn(() => new Promise(() => {})); // signature prompt left open
+  write.fn = calls;
+  const { rerender } = renderFlow();
+  fireEvent.click(screen.getByRole('button', { name: /Approve/ }));
+  wallet.chainId = NETWORKS.mainnet.chain.id;
+  rerender(<QueryClientProvider client={new QueryClient()}><DepositFlow vault={vault} defaultAmount={100} /></QueryClientProvider>);
+  wallet.chainId = NETWORKS.testnet.chain.id;
+  rerender(<QueryClientProvider client={new QueryClient()}><DepositFlow vault={vault} defaultAmount={100} /></QueryClientProvider>);
+  const again = screen.queryByRole('button', { name: /Approve/ });
+  if (again) fireEvent.click(again);
+  expect(calls).toHaveBeenCalledTimes(1);
 });

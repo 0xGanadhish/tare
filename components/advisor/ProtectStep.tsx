@@ -20,13 +20,15 @@ export interface ProtectStepProps {
   onDone(): void;
   /** Pre-fill from an existing rule (Watch "Edit rule"). */
   initial?: { minConfidenceBps: number; maxAge: number };
+  /** The vault's latest onchain verdict is EXIT: enabling now resets the rule, so Guardian will not act on that verdict. */
+  liveExit?: boolean;
 }
 
 /**
  * "Protect with Guardian" (spec §8.2): approve vault shares to GuardianV2, then enable(vault, minConfidenceBps, maxAge).
  * Guardian can only ever redeem those shares back to the owner's wallet.
  */
-export function ProtectStep({ vault, onDone, initial }: ProtectStepProps) {
+export function ProtectStep({ vault, onDone, initial, liveExit }: ProtectStepProps) {
   const { address } = useAccount();
   const { config } = useNetwork();
   const { writeContractAsync } = useWriteContract();
@@ -61,6 +63,12 @@ export function ProtectStep({ vault, onDone, initial }: ProtectStepProps) {
       <p className="mt-1 text-[12.5px] leading-snug text-secondary">
         If Jev posts an EXIT verdict for this vault onchain, anyone can trigger Guardian to send your funds back to your wallet. Nothing else can move them.
       </p>
+      {liveExit && (
+        <p role="note" className="mt-2 rounded-lg border border-avoid/40 bg-avoid/5 p-2.5 text-[12px] leading-snug text-ink">
+          Jev&apos;s current EXIT verdict for this vault was posted before this change, so Guardian will not act on it; it waits for a newer
+          EXIT. To leave now, use Exit now.
+        </p>
+      )}
       <label htmlFor={`conf-${vault}`} className="mt-3 flex justify-between text-[11.5px] text-secondary">
         <span>Exit when Jev is at least</span>
         <span className="mono text-ink">{pct}% sure</span>

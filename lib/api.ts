@@ -4,7 +4,7 @@ import { readPools, readVerdicts } from '../shared/cache';
 import type { Intent, Pool, Verdict } from '../shared/types';
 import { BackendUnavailable, serverBackend } from './backend';
 
-/** Market data: fixtures when offline or DATA_SOURCE=fixtures, else the backend (BACKEND_URL), else the worker cache, else fixtures. */
+/** Market data: fixtures when offline or DATA_SOURCE=fixtures, else the backend (BACKEND_URL; throws BackendUnavailable when it can't answer), else the local worker cache. */
 export async function readMarket(): Promise<{ pools: Pool[]; verdicts: Record<string, Verdict>; asOf: string }> {
   if (process.env.OFFLINE === '1') {
     const dir = process.env.FIXTURES_DIR ?? join(process.cwd(), 'fixtures');
@@ -15,14 +15,10 @@ export async function readMarket(): Promise<{ pools: Pool[]; verdicts: Record<st
   }
   const backend = process.env.DATA_SOURCE === 'fixtures' ? null : serverBackend();
   if (backend) {
-    try {
-      const market = await backend.pools();
-      // An empty backend (before its first pool scan) has no asOf: fall through to the cache.
-      if (market.asOf) return { pools: market.pools, verdicts: market.verdicts, asOf: market.asOf };
-    } catch (err) {
-      if (!(err instanceof BackendUnavailable)) throw err;
-      console.warn(err.message);
-    }
+    // With a backend configured, its answer is the only live source: falling back here could show fixture pools as live.
+    const market = await backend.pools();
+    if (!market.asOf) throw new BackendUnavailable('/v1/pools', null, new Error('backend has no pool scan yet'));
+    return { pools: market.pools, verdicts: market.verdicts, asOf: market.asOf };
   }
   const [market, verdicts] = await Promise.all([readPools(), readVerdicts()]);
   return { ...market, verdicts };

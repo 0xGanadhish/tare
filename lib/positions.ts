@@ -54,15 +54,16 @@ export async function readPositions(network: Network, owner: Address, deps: Posi
   const positions = await Promise.all(config.vaults.map(async (vault): Promise<PositionV2 | null> => {
     const shares = await client.readContract({ address: vault.address, abi: abis.erc4626, functionName: 'balanceOf', args: [owner] });
     if (shares === 0n) return null;
-    const [assets, rule, latest] = await Promise.all([
+    const [assets, redeemable, rule, latest] = await Promise.all([
       client.readContract({ address: vault.address, abi: abis.erc4626, functionName: 'convertToAssets', args: [shares] }),
+      client.readContract({ address: vault.address, abi: abis.erc4626, functionName: 'maxRedeem', args: [owner] }),
       config.guardian === UNDEPLOYED
         ? null
         : client.readContract({ address: config.guardian, abi: abis.guardianV2, functionName: 'rules', args: [owner, vault.address] }),
       latestVerdict(deps, network, vault.address),
     ]);
     return {
-      vault, shares, assets,
+      vault, shares, assets, redeemable,
       rule: rule ? { enabled: rule[0], minConfidenceBps: rule[1], maxAge: rule[2] } : null,
       latest,
     };

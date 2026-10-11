@@ -28,7 +28,7 @@ export function partialDetail(e: FeedEvent): string | null {
 
 /** Plain wording for Guardian revert reasons that reach the feed. */
 const EXIT_ERRORS: [string, string][] = [
-  ['VerdictAlreadyUsed', 'already exited on this verdict; Guardian waits for a newer EXIT verdict'],
+  ['VerdictAlreadyUsed', 'Guardian already used this verdict (an exit ran on it, or your rule changed after it); it waits for a newer EXIT verdict'],
   ['StaleVerdict', 'the verdict was older than your freshness limit'],
   ['BelowThreshold', "Jev's confidence was below your rule"],
   ['VerdictPredatesEnable', 'the verdict was posted before you turned Guardian on'],

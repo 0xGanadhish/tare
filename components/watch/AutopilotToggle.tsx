@@ -11,7 +11,7 @@ import { ProtectStep } from '@/components/advisor/ProtectStep';
 import { useNetwork } from '@/components/network/NetworkProvider';
 
 /** Guardian rule controls: ON opens ProtectStep (approve shares + enable rule); OFF calls GuardianV2.disable. All user-signed. */
-export function AutopilotToggle({ vault, rule }: { vault: `0x${string}`; rule: PositionV2['rule'] }) {
+export function AutopilotToggle({ vault, rule, liveExit }: { vault: `0x${string}`; rule: PositionV2['rule']; liveExit?: boolean }) {
   const { config } = useNetwork();
   const { writeContractAsync } = useWriteContract();
   const [editing, setEditing] = useState(false);
@@ -20,7 +20,7 @@ export function AutopilotToggle({ vault, rule }: { vault: `0x${string}`; rule: P
   if (editing) {
     return (
       <div>
-        <ProtectStep vault={vault} initial={rule?.enabled ? rule : undefined} onDone={() => setEditing(false)} />
+        <ProtectStep vault={vault} initial={rule?.enabled ? rule : undefined} liveExit={liveExit} onDone={() => setEditing(false)} />
         <button type="button" onClick={() => setEditing(false)} className="mono mt-2 text-[11px] text-muted underline underline-offset-4">
           Cancel
         </button>

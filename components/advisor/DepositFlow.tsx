@@ -141,7 +141,7 @@ export function DepositFlow({ vault, defaultAmount }: DepositFlowProps) {
         </p>
       )}
       <div className="mt-3 space-y-3">
-        <StepButton
+        <TxButton
           blocked={blocked}
           label="1 · Approve"
           variant="secondary"
@@ -149,7 +149,7 @@ export function DepositFlow({ vault, defaultAmount }: DepositFlowProps) {
           run={() => writeContractAsync({ ...common, address: token, abi: abis.mockToken, functionName: 'approve', args: [vault.address, amount.ok ? amount.value : 0n] })}
         />
         {approved && !showError && <p className="mono text-[11px] text-secondary">Approved on-chain.</p>}
-        <StepButton
+        <TxButton
           blocked={blocked}
           label="2 · Deposit"
           disabled={!amount.ok || !approved || !address}
@@ -166,14 +166,3 @@ export function DepositFlow({ vault, defaultAmount }: DepositFlowProps) {
   );
 }
 
-/** A step is a plain disabled button while the wallet is on the wrong chain, so nothing can be sent to it. */
-function StepButton({ blocked, ...props }: React.ComponentProps<typeof TxButton> & { blocked: boolean }) {
-  if (blocked) {
-    return (
-      <Button variant={props.variant} disabled className="w-full sm:w-auto">
-        {props.label}
-      </Button>
-    );
-  }
-  return <TxButton {...props} />;
-}

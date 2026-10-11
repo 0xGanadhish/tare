@@ -71,12 +71,12 @@ describe('readMarket source order', () => {
     expect(fetchFn).toHaveBeenCalledWith('https://api.example/v1/pools', expect.anything());
   });
 
-  test('readMarket falls back to the cache/fixtures when the backend is down', async () => {
+  test('backend configured but down: readMarket fails instead of showing cache/fixture pools as live', async () => {
     vi.stubEnv('DATA_SOURCE', '');
     vi.stubEnv('OFFLINE', '');
     vi.stubEnv('BACKEND_URL', 'https://api.example');
     vi.stubGlobal('fetch', vi.fn(async () => new Response('down', { status: 503 })));
     const { readMarket } = await import('./api');
-    expect((await readMarket()).pools.length).toBeGreaterThan(0);
+    await expect(readMarket()).rejects.toMatchObject({ name: 'BackendUnavailable' }); // resetModules gives a fresh class
   });
 });
