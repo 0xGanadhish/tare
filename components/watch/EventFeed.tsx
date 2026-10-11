@@ -10,6 +10,7 @@ import { exitErrorText, partialDetail, type FeedEvent } from './feed';
 const TONE: Record<string, string> = {
   stats_changed: 'text-secondary',
   judged: 'text-ink',
+  jev_unavailable: 'text-secondary',
   posted: 'text-ink',
   alert: 'text-avoid',
   exit_sent: 'text-ink',
@@ -20,6 +21,7 @@ const TONE: Record<string, string> = {
 const TITLE: Record<string, string> = {
   stats_changed: 'Vault stats changed',
   judged: 'Jev judged',
+  jev_unavailable: 'Jev unavailable',
   posted: 'Verdict posted onchain',
   alert: 'Alert',
   exit_sent: 'Exit sent',

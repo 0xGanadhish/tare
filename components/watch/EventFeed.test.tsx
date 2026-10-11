@@ -46,3 +46,15 @@ describe('exit errors', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/already exited on this verdict/);
   });
 });
+
+describe('backend wording', () => {
+  test('backend partial message is not doubled', () => {
+    render(<EventFeed network="testnet" connected events={[{ ...base, type: 'exit_partial', message: 'Partly out: 12 USDC still locked' }]} positions={[]} />);
+    expect(screen.getByText(/Partly out · 12 USDC still locked/)).toBeTruthy();
+    expect(screen.queryByText(/Partly out · Partly out/)).toBeNull();
+  });
+  test('jev_unavailable gets a plain title', () => {
+    render(<EventFeed network="testnet" connected events={[{ ...base, type: 'jev_unavailable', txHash: null, message: 'Jev did not answer' }]} positions={[]} />);
+    expect(screen.getByText('Jev unavailable')).toBeTruthy();
+  });
+});
