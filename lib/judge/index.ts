@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PositionJudgment, Verdict } from '../../shared/types';
 import { answerChoice } from '../intent';
-import { jev, JevUnavailable, type JevOptions, type JevQuestion } from '../jev';
+import { jev, JEV_MODEL, JevUnavailable, type JevAnswer, type JevOptions, type JevQuestion } from '../jev';
 import { combineVerdict } from './combine';
 import { renderPoolState, renderPositionState, type PositionInput } from './state';
 
@@ -18,7 +18,7 @@ export const poolQuestions: Record<string, JevQuestion> = {
     'Highest risk: tiny TVL, extreme volatility, fragile emissions, severe IL or exotic asset risk.',
   ] },
 };
-const positionQuestions: Record<string, JevQuestion> = {
+export const positionQuestions: Record<string, JevQuestion> = {
   action: { type: 'choice', instructions: 'What should the holder do given current stats, deposit stats, and the best same-risk alternative?', criteria: {
     hold: 'Keep the position; yield and withdrawal conditions remain acceptable.',
     exit: 'Withdraw to protect capital from worsening withdrawal conditions or material yield deterioration.',
@@ -62,12 +62,26 @@ export async function judgePool(p: Pool, opts: JevOptions = {}): Promise<Verdict
   return judgment;
 }
 
-export async function judgePosition(input: PositionInput): Promise<PositionJudgment> {
+export interface DetailedPositionJudgment {
+  judgment: PositionJudgment;
+  state: string;
+  questions: Record<string, JevQuestion>;
+  answers: Record<string, JevAnswer>;
+  model: string;
+}
+
+/** Same judgment as judgePosition, plus exactly what Jev was asked and answered (archived as the stateHash preimage). */
+export async function judgePositionDetailed(input: PositionInput, opts: JevOptions = {}): Promise<DetailedPositionJudgment> {
   const state = renderPositionState(input);
-  const answers = await jev(state, positionQuestions);
+  const answers = await jev(state, positionQuestions, opts);
   const withdrawal = answers.withdrawal_risk;
   const collapse = answers.yield_collapse;
   if (withdrawal.type !== 'noul' || collapse.type !== 'noul') throw new JevUnavailable('Invalid position answers');
-  return { action: answerChoice(answers.action), withdrawalRisk: withdrawal.noul, yieldCollapse: collapse.noul,
+  const judgment: PositionJudgment = { action: answerChoice(answers.action), withdrawalRisk: withdrawal.noul, yieldCollapse: collapse.noul,
     statsHash: createHash('sha256').update(state).digest('hex'), at: new Date().toISOString() };
+  return { judgment, state, questions: positionQuestions, answers, model: JEV_MODEL };
+}
+
+export async function judgePosition(input: PositionInput, opts: JevOptions = {}): Promise<PositionJudgment> {
+  return (await judgePositionDetailed(input, opts)).judgment;
 }
