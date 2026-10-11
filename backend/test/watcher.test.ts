@@ -28,7 +28,12 @@ function fakeDeps(over: Partial<WatcherDeps> & { util?: number } = {}) {
     readFlows: async () => null,
     readProtections: async () => [{ owner: OWNER_A, minConfidenceBps: 9000 }, { owner: OWNER_B, minConfidenceBps: 9500 }],
     judge: async () => { calls.judged++; return detailed('exit', 0.92); },
-    post: async (...args) => { calls.posts.push(args); return { id: 7n, txHash: `0x${'77'.repeat(32)}` }; },
+    post: async (...args) => {
+      calls.posts.push(args);
+      // Mirror what postVerdict writes, so the next tick sees the vault has a post.
+      await env.DB.prepare(`INSERT OR IGNORE INTO posts (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at) VALUES ('testnet', 7, ?, 1, 9200, 4000, '0x', 1)`).bind(MIRROR.toLowerCase()).run();
+      return { id: 7n, txHash: `0x${'77'.repeat(32)}` };
+    },
     enqueue: async (job) => { calls.jobs.push(job); },
     ...over,
   };
@@ -55,7 +60,7 @@ describe('VaultWatcher', () => {
     const stub = await startWatcher(deps);
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(calls.posts).toHaveLength(0);
-    expect((await events()).map((e) => e.type)).toEqual(['jev_unavailable']);
+    expect((await events()).filter((e) => e.owner === null).map((e) => e.type)).toEqual(['jev_unavailable']);
     expect(await alarmOf(stub)).not.toBeNull();
   });
 
@@ -63,7 +68,8 @@ describe('VaultWatcher', () => {
     const { deps } = fakeDeps({ util: 9600, judge: async () => { throw new JevUnavailable('down'); } });
     const stub = await startWatcher(deps);
     await runDurableObjectAlarm(stub);
-    expect((await events()).map((e) => e.type).sort()).toEqual(['alert', 'jev_unavailable']);
+    expect((await events()).filter((e) => e.owner === null).map((e) => e.type).sort()).toEqual(['alert', 'jev_unavailable']);
+    expect((await events()).filter((e) => e.owner === OWNER_A.toLowerCase()).map((e) => e.type).sort()).toEqual(['alert', 'jev_unavailable']);
   });
 
   it('watcher: EXIT 9200 posts once and enqueues only owners at or below 9200', async () => {
@@ -89,10 +95,33 @@ describe('VaultWatcher', () => {
     const { deps, calls } = fakeDeps({ judge: async () => { calls.judged++; return detailed('hold', 0.8); } });
     const stub = await startWatcher(deps);
     await runDurableObjectAlarm(stub);
-    // The DO checks D1 for an existing post; mirror what postVerdict would have written.
-    await env.DB.prepare(`INSERT INTO posts (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at) VALUES ('testnet', 7, ?, 0, 8000, 4000, '0x', 1)`).bind(MIRROR.toLowerCase()).run();
     await runDurableObjectAlarm(stub);
     expect(calls.judged).toBe(1);
+  });
+
+  it('watcher: Jev down on two ticks warns each protected owner once', async () => {
+    const { deps } = fakeDeps({ judge: async () => { throw new JevUnavailable('down'); } });
+    const stub = await startWatcher(deps);
+    await runDurableObjectAlarm(stub);
+    await runDurableObjectAlarm(stub);
+    const warnings = (await events()).filter((e) => e.type === 'jev_unavailable');
+    expect(warnings.map((e) => e.owner).sort()).toEqual([null, OWNER_A.toLowerCase(), OWNER_B.toLowerCase()].sort());
+  });
+
+  it('watcher: a failure after the post lands does not post again on the next tick', async () => {
+    let fail = true;
+    const { deps, calls } = fakeDeps({ readProtections: async () => { if (fail) { fail = false; throw new Error('d1 hiccup'); } return []; } });
+    const stub = await startWatcher(deps);
+    await runDurableObjectAlarm(stub);
+    await runDurableObjectAlarm(stub);
+    expect(calls.posts).toHaveLength(1);
+  });
+
+  it('watcher: RPC URLs never reach vault_health', async () => {
+    const { deps } = fakeDeps({ readVault: async () => { throw new Error('HTTP request failed. URL: https://monad-testnet.g.alchemy.com/v2/SECRETKEY'); } });
+    const stub = await startWatcher(deps);
+    await runDurableObjectAlarm(stub);
+    expect(await env.DB.prepare('SELECT last_error FROM vault_health').first('last_error')).not.toContain('SECRETKEY');
   });
 
   it('watcher: a post failure is recorded in vault_health and the alarm still reschedules', async () => {

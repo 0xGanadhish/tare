@@ -11,6 +11,7 @@ import { postVerdict } from './archive';
 import { afterJudgment, decide } from './decide';
 import type { Env, ExitJob } from './env';
 import { realEnvioDeps, readFlows, readProtections } from './envio';
+import { safeError } from './errors';
 import { addEvent } from './events';
 import { readVault } from './vaultReader';
 
@@ -32,6 +33,38 @@ interface WatchState { network: Network; vault: Address; last: VaultStats | null
 
 const pct = (bps: number) => `${(bps / 100).toFixed(0)}%`;
 
+/**
+ * After a verdict is onchain: tell protected owners, queue exits for those whose threshold it meets, and
+ * alert the rest. Shared by the watcher and the admin drill so a drill behaves exactly like a real EXIT.
+ */
+export async function fanOut(
+  db: D1Database, deps: Pick<WatcherDeps, 'readProtections' | 'enqueue'>, network: Network, vault: VaultConfig,
+  id: bigint, judgment: PositionJudgment, txHash: Hex,
+): Promise<void> {
+  const address = vault.address as Address;
+  const post = toOraclePost(judgment);
+  const confidence = judgment.action.confidence;
+  const protections = await deps.readProtections(network, vault);
+  for (const { owner } of protections) {
+    await addEvent(db, { network, vault: address, owner, type: 'posted', message: `Verdict #${id} posted onchain: ${judgment.action.value} at ${pct(post.confidenceBps)}`, txHash, confidence });
+  }
+  const { enqueue, alert } = afterJudgment(post, protections);
+  for (const owner of enqueue) {
+    await deps.enqueue({ network, vault: address, owner, verdictId: id.toString() });
+    await addEvent(db, { network, vault: address, owner, type: 'exit_sent', message: `Guardian is pulling you out (Jev ${pct(post.confidenceBps)} sure)`, txHash, confidence });
+  }
+  if (alert) {
+    const queued = new Set(enqueue.map((o) => o.toLowerCase()));
+    const watchers = protections.filter((p) => !queued.has(p.owner.toLowerCase())).map((p) => p.owner);
+    for (const owner of [null, ...watchers]) {
+      await addEvent(db, { network, vault: address, owner, type: 'alert', message: `Jev says exit (${pct(post.confidenceBps)} sure). You can exit now.`, confidence });
+    }
+  }
+}
+
+/** last_error prefix marking a Jev outage, so the warning goes out once per outage, not once per tick. */
+const JEV_DOWN = 'jev: ';
+
 /** One watcher pass for one vault (plan Task 11). Never throws: failures land in vault_health and the events feed. */
 export async function watchOnce(db: D1Database, vault: VaultConfig, network: Network, last: VaultStats | null, deps: WatcherDeps): Promise<VaultStats | null> {
   const address = vault.address as Address;
@@ -39,8 +72,15 @@ export async function watchOnce(db: D1Database, vault: VaultConfig, network: Net
   const health = (lastPostAt: string | null, error: string | null) => db.prepare(`INSERT INTO vault_health (network, vault, last_post_at, last_error, updated_at)
       VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (network, vault) DO UPDATE SET last_post_at = COALESCE(?3, last_post_at), last_error = ?4, updated_at = ?5`)
     .bind(network, address.toLowerCase(), lastPostAt, error, now()).run();
+  const fail = (stage: string, err: unknown, prefix = '') => {
+    const message = `${prefix}${safeError(err)}`;
+    console.error(JSON.stringify({ msg: 'watch_failed', stage, network, vault: address, error: message }));
+    return health(null, message);
+  };
 
-  let reading: VaultReading | null = null;
+  let reading: VaultReading;
+  let detail: DetailedPositionJudgment;
+  let posted: { id: bigint; txHash: Hex };
   try {
     reading = await deps.readVault(network, vault);
     const flows = await deps.readFlows(network, vault, reading);
@@ -54,41 +94,38 @@ export async function watchOnce(db: D1Database, vault: VaultConfig, network: Net
       atDeposit: last ?? reading.stats, alternative: null, protocolName: vault.protocol, isMirror: vault.protocol === 'mirror',
       flows, liquidityPct: reading.stats.liquidityPct,
     };
-    const detail = await deps.judge(input);
+    try {
+      detail = await deps.judge(input);
+    } catch (err) {
+      if (!(err instanceof JevUnavailable)) throw err;
+      const previous = await db.prepare('SELECT last_error FROM vault_health WHERE network = ? AND vault = ?').bind(network, address.toLowerCase()).first<string | null>('last_error');
+      await fail('judge', err, JEV_DOWN);
+      if (!previous?.startsWith(JEV_DOWN)) {
+        const owners = await deps.readProtections(network, vault).then((ps) => ps.map((p) => p.owner), () => [] as Address[]);
+        const urgent = reading.stats.utilBps >= FALLBACK_UTIL_BPS;
+        for (const owner of [null, ...owners]) {
+          await addEvent(db, { network, vault: address, owner, type: 'jev_unavailable', message: 'Jev is unreachable, so no verdict can be posted and Guardian cannot exit for you.' });
+          if (urgent) await addEvent(db, { network, vault: address, owner, type: 'alert', message: `Utilization is ${pct(reading.stats.utilBps)} and Jev is down. Consider exiting.` });
+        }
+      }
+      return last;
+    }
     const doc: StateDocument = { v: 1, network, vault: address, state: detail.state, questions: detail.questions, answers: detail.answers, model: detail.model, at: now(), drill: false };
-    const { id, txHash } = await deps.post(network, address, detail.judgment, doc);
-    await health(now(), null);
-    const post = toOraclePost(detail.judgment);
-    await addEvent(db, { network, vault: address, type: 'judged', message: `Jev: ${detail.judgment.action.value} at ${pct(post.confidenceBps)}`, txHash, confidence: detail.judgment.action.confidence });
-    const protections = await deps.readProtections(network, vault);
-    for (const { owner } of protections) {
-      await addEvent(db, { network, vault: address, owner, type: 'posted', message: `Verdict #${id} posted onchain: ${detail.judgment.action.value} at ${pct(post.confidenceBps)}`, txHash, confidence: detail.judgment.action.confidence });
-    }
-    const { enqueue, alert } = afterJudgment(post, protections);
-    for (const owner of enqueue) {
-      await deps.enqueue({ network, vault: address, owner, verdictId: id.toString() });
-      await addEvent(db, { network, vault: address, owner, type: 'exit_sent', message: `Guardian is pulling you out (Jev ${pct(post.confidenceBps)} sure)`, txHash, confidence: detail.judgment.action.confidence });
-    }
-    if (alert) {
-      const queued = new Set(enqueue.map((o) => o.toLowerCase()));
-      const watchers = protections.filter((p) => !queued.has(p.owner.toLowerCase())).map((p) => p.owner);
-      for (const owner of [null, ...watchers]) {
-        await addEvent(db, { network, vault: address, owner, type: 'alert', message: `Jev says exit (${pct(post.confidenceBps)} sure). You can exit now.`, confidence: detail.judgment.action.confidence });
-      }
-    }
-    return reading.stats;
+    posted = await deps.post(network, address, detail.judgment, doc);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(JSON.stringify({ msg: 'watch_failed', network, vault: address, error: message }));
-    await health(null, message);
-    if (err instanceof JevUnavailable) {
-      await addEvent(db, { network, vault: address, type: 'jev_unavailable', message: 'Jev is unreachable; no verdict posted, so Guardian cannot exit.' });
-      if (reading && reading.stats.utilBps >= FALLBACK_UTIL_BPS) {
-        await addEvent(db, { network, vault: address, type: 'alert', message: `Utilization is ${pct(reading.stats.utilBps)} and Jev is down. Consider exiting.` });
-      }
-    }
+    await fail('post', err);
     return last;
   }
+
+  // The verdict is onchain now: whatever fails below, these stats count as judged so the next tick doesn't post again.
+  try {
+    await health(now(), null);
+    await addEvent(db, { network, vault: address, type: 'judged', message: `Jev: ${detail.judgment.action.value} at ${pct(toOraclePost(detail.judgment).confidenceBps)}`, txHash: posted.txHash, confidence: detail.judgment.action.confidence });
+    await fanOut(db, deps, network, vault, posted.id, detail.judgment, posted.txHash);
+  } catch (err) {
+    await fail('fan_out', err).catch(() => undefined);
+  }
+  return reading.stats;
 }
 
 /** Durable Object named `${network}:${vault}`: an alarm loop that watches one vault. */
