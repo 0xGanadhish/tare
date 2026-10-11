@@ -20,7 +20,7 @@ type Verdict {
   txHash: String!
   resolved: Boolean!
   adverse: Boolean
-  reasons: Int
+  reasons: Int # bitmask: 1 share price drop, 2 TVL drop, 4 liquidity floor, 8 vault unreadable (REASON_BROKEN)
   resolvedAt: BigInt
   exits: [Exit!]! @derivedFrom(field: "verdict")
 }

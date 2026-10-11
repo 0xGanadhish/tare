@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveChain, renderConfig, PLACEHOLDER_ORACLE } from '../scripts/gen-config.mjs';
+import { resolveChain, renderConfig, renderStartBlocks, PLACEHOLDER_ORACLE } from '../scripts/gen-config.mjs';
 
 describe('gen-config', () => {
   it('uses v2 fields when present', () => {
@@ -30,5 +30,9 @@ describe('gen-config', () => {
     expect(yaml).toContain('address: "0x0a"');
     expect(yaml).toContain('- "0x0c"');
     expect(yaml).toContain('start_block: 5');
+  });
+
+  it('writes start blocks for the RPC baseline', () => {
+    expect(renderStartBlocks([{ id: 10143, startBlock: 5 }, { id: 143, startBlock: 9 }])).toContain('{ 10143: 5, 143: 9 }');
   });
 });

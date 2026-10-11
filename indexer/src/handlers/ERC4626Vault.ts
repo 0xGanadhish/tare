@@ -5,11 +5,11 @@ import { hourOf, logId, lower, vaultKey } from '../ids';
 
 type Ctx = Parameters<Parameters<typeof ERC4626Vault.Deposit.handler>[0]>[0]['context'];
 
-async function vaultState(context: Ctx, chainId: number, vault: string, blockNumber: number): Promise<VaultState> {
+async function vaultState(context: Ctx, chainId: number, vault: string): Promise<VaultState> {
   const id = vaultKey(chainId, vault);
   const existing = await context.VaultState.get(id);
   if (existing) return existing;
-  const baseline = await context.effect(readTotalAssets, { chainId, vault: lower(vault), blockNumber });
+  const baseline = await context.effect(readTotalAssets, { chainId, vault: lower(vault) });
   return { id, chainId, vault: lower(vault), trackedAssets: baseline ? BigInt(baseline) : 0n, baselineFromRpc: baseline !== null };
 }
 
@@ -31,7 +31,7 @@ async function flowHour(context: Ctx, chainId: number, vault: string, timestamp:
 
 ERC4626Vault.Deposit.handler(async ({ event, context }) => {
   const { assets } = event.params;
-  const state = await vaultState(context, event.chainId, event.srcAddress, event.block.number);
+  const state = await vaultState(context, event.chainId, event.srcAddress);
   const hour = await flowHour(context, event.chainId, event.srcAddress, event.block.timestamp);
   context.VaultFlowHour.set({ ...hour, inAssets: hour.inAssets + assets });
   context.VaultState.set({ ...state, trackedAssets: applyFlow(state.trackedAssets, assets) });
@@ -39,7 +39,7 @@ ERC4626Vault.Deposit.handler(async ({ event, context }) => {
 
 ERC4626Vault.Withdraw.handler(async ({ event, context }) => {
   const { assets } = event.params;
-  const state = await vaultState(context, event.chainId, event.srcAddress, event.block.number);
+  const state = await vaultState(context, event.chainId, event.srcAddress);
   const hour = await flowHour(context, event.chainId, event.srcAddress, event.block.timestamp);
   context.VaultFlowHour.set({
     ...hour,

@@ -237,7 +237,7 @@ describe('ERC4626Vault flows', () => {
     await indexer.process({
       chains: { [CHAIN]: { simulate: [withdraw(10n, HOUR, 100), deposit(1_000n, HOUR + 1, 101), withdraw(9n, HOUR + 2, 102), withdraw(10n, HOUR + 3, 103)] } },
     });
-    // First withdraw has nothing to compare against, so it is not flagged. 9 < 1% of 990; 10 >= 1% of 981.
+    // First withdraw has nothing to compare against and clamps tracked to 0. 9 < 1% of 1000; 10 >= 1% of 991.
     const large = await indexer.LargeWithdrawal.getAll();
     t.expect(large.map((l) => l.assets)).toEqual([10n]);
     t.expect(large[0]!.at).toBe(BigInt(HOUR + 3));
