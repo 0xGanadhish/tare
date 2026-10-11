@@ -27,10 +27,14 @@ Until Task 6 writes the v2 fields, the oracle and guardian are placeholder addre
 
 ## Develop
 
+`generated/` is created by `envio codegen` and is a workspace package (see the root `pnpm-workspace.yaml`), so a `pnpm install` after codegen is what installs its dependencies. `pretest` does that for you.
+
+From a fresh clone:
+
 ```bash
-pnpm install
-pnpm codegen
-pnpm test                 # simulated events, no network
+pnpm install              # at the repo root
+cd indexer
+pnpm test                 # pretest regenerates config, runs codegen, then installs generated/'s deps; simulated events, no network
 pnpm typecheck
 TUI_OFF=true pnpm dev     # needs Docker and ENVIO_API_TOKEN (see .env.example)
 ```
