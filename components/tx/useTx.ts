@@ -15,6 +15,8 @@ export interface ConfirmedTx {
 export interface UseTxOptions {
   /** Called only after a receipt with status `success` (balances are already being re-read). */
   onConfirmed?: (tx: ConfirmedTx) => void;
+  /** Chain to wait for the receipt on (the chain the tx was sent to). */
+  chainId?: number;
 }
 
 /**
@@ -30,6 +32,8 @@ export function useTx(opts: UseTxOptions = {}): { state: TxState; run: (write: (
   const busy = useRef(false);
   const onConfirmed = useRef(opts.onConfirmed);
   onConfirmed.current = opts.onConfirmed;
+  const chainIdRef = useRef(opts.chainId);
+  chainIdRef.current = opts.chainId;
 
   const run = useCallback(
     async (write: () => Promise<Hash>) => {
@@ -43,7 +47,7 @@ export function useTx(opts: UseTxOptions = {}): { state: TxState; run: (write: (
         sentAt = Date.now();
         dispatch({ type: 'signed', hash, at: sentAt });
         // Monad blocks are 400ms: poll fast so "Confirmed in 0.6s" can be true.
-        const receipt = await waitForTransactionReceipt(config, { hash, pollingInterval: 200, timeout: 60_000 });
+        const receipt = await waitForTransactionReceipt(config, { hash, chainId: chainIdRef.current, pollingInterval: 200, timeout: 60_000 });
         const at = Date.now();
         dispatch({ type: 'receipt', status: receipt.status, block: receipt.blockNumber, at });
         if (receipt.status === 'success') {

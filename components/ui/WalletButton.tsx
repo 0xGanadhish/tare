@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { injected, useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
-import { monadTestnet } from '@/shared/chains';
+import { injected, useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
 import { Button } from './Button';
 import { shortHash } from '@/components/tx/explorer';
+import { networkLabel, useNetwork } from '@/components/network/NetworkProvider';
 
-/** Injected-wallet connect + "switch to Monad testnet" prompt. */
+/** Injected-wallet connect + "switch to Monad {network}" prompt for the selected network. */
 export function WalletButton() {
-  const { address, isConnected, isConnecting } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected, isConnecting, chainId } = useAccount();
+  const { network, config } = useNetwork();
   const { connect, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: switching } = useSwitchChain();
@@ -51,10 +51,10 @@ export function WalletButton() {
     );
   }
 
-  if (chainId !== monadTestnet.id) {
+  if (chainId !== config.chain.id) {
     return (
-      <Button size="sm" variant="purple" disabled={switching} onClick={() => switchChain({ chainId: monadTestnet.id })}>
-        {switching ? 'Switching…' : 'Switch to Monad testnet'}
+      <Button size="sm" variant="purple" disabled={switching} onClick={() => switchChain({ chainId: config.chain.id })}>
+        {switching ? 'Switching…' : `Switch to ${networkLabel(network)}`}
       </Button>
     );
   }
