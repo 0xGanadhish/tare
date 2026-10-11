@@ -65,3 +65,8 @@ describe('verdict floor wording', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/rule changed after it/);
   });
 });
+
+test('jev_unavailable is shown as a warning', () => {
+  render(<EventFeed network="testnet" connected events={[{ ...base, type: 'jev_unavailable', txHash: null, message: 'Jev is unreachable, so no verdict can be posted and Guardian cannot exit for you' }]} positions={[]} />);
+  expect(screen.getByRole('status').textContent).toMatch(/Guardian cannot exit for you/);
+});
