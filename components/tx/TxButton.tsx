@@ -22,13 +22,15 @@ export interface TxButtonProps {
   popover?: boolean;
   /** Chain the tx must go to. Defaults to the selected network; testnet-only features (faucet, Launch, demo) pin testnet. */
   chainId?: number;
+  /** Fully disabled (no connect/switch prompt), e.g. while the wallet is on the wrong chain. Stays mounted so an in-flight tx keeps its state. */
+  blocked?: boolean;
 }
 
 /**
  * Button + live transaction status. If the wallet is not connected or on the wrong network the
  * button first asks for that instead of sending (so pages never need their own connect gate).
  */
-export function TxButton({ label, run, disabled, onConfirmed, variant, size, className, popover, chainId: target }: TxButtonProps) {
+export function TxButton({ label, run, disabled, onConfirmed, variant, size, className, popover, chainId: target, blocked }: TxButtonProps) {
   // The wallet's real chain: useChainId() falls back to a configured chain when the wallet is elsewhere.
   const { isConnected, chainId } = useAccount();
   const { network, config } = useNetwork();
@@ -57,7 +59,9 @@ export function TxButton({ label, run, disabled, onConfirmed, variant, size, cla
   const needsConnect = !isConnected;
   const needsSwitch = isConnected && chainId !== targetChain;
 
-  const text = needsConnect
+  const text = blocked
+    ? label
+    : needsConnect
     ? 'Connect wallet'
     : needsSwitch
       ? `Switch to ${targetLabel}`
@@ -75,7 +79,7 @@ export function TxButton({ label, run, disabled, onConfirmed, variant, size, cla
 
   return (
     <div ref={ref} className={`relative ${popover ? 'inline-block' : ''} ${className ?? ''}`}>
-      <Button variant={variant} size={size} onClick={onClick} disabled={busy || (disabled && !needsConnect && !needsSwitch)} className={popover ? '' : 'w-full sm:w-auto'}>
+      <Button variant={variant} size={size} onClick={onClick} disabled={busy || blocked || (disabled && !needsConnect && !needsSwitch)} className={popover ? '' : 'w-full sm:w-auto'}>
         {text}
       </Button>
       {popover ? (

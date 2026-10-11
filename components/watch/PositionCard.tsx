@@ -9,6 +9,7 @@ import { TxButton } from '@/components/tx/TxButton';
 import { shortHash, txUrl } from '@/components/tx/explorer';
 import { useNetwork } from '@/components/network/NetworkProvider';
 import { AutopilotToggle } from './AutopilotToggle';
+import { exitPlan } from './exit';
 
 export function fmtUsdc(raw: bigint | string): string {
   try {
@@ -23,15 +24,23 @@ export function ExitButton({ position, label = 'Exit now' }: { position: Positio
   const { address } = useAccount();
   const { config } = useNetwork();
   const { writeContractAsync } = useWriteContract();
+  const plan = exitPlan(position.shares, position.redeemable);
   return (
-    <TxButton
-      label={label}
-      variant="secondary"
-      disabled={!address || position.shares === 0n}
-      run={() =>
-        writeContractAsync({ chainId: config.chain.id, address: position.vault.address, abi: abis.erc4626, functionName: 'redeem', args: [position.shares, address!, address!] })
-      }
-    />
+    <div>
+      <TxButton
+        label={plan.locked > 0n ? `${label} (what's available)` : label}
+        variant="secondary"
+        disabled={!address || plan.shares === 0n}
+        run={() =>
+          writeContractAsync({ chainId: config.chain.id, address: position.vault.address, abi: abis.erc4626, functionName: 'redeem', args: [plan.shares, address!, address!] })
+        }
+      />
+      {plan.locked > 0n && (
+        <p className="mono mt-1 text-[11px] text-secondary">
+          {plan.shares === 0n ? 'All of it is locked in the vault right now.' : 'Part of it is locked in the vault right now; exit the rest later.'}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -85,7 +94,7 @@ export function PositionCard({ position, network }: { position: PositionV2; netw
         <p className="mono mt-3 text-[11px] text-muted">No onchain verdict for this vault yet.</p>
       )}
       <div className="mt-4 flex flex-col gap-3 border-t border-hairline pt-4">
-        <AutopilotToggle vault={position.vault.address} rule={rule} />
+        <AutopilotToggle vault={position.vault.address} rule={rule} liveExit={latest?.verdict === 'EXIT'} />
         <ExitButton position={position} />
       </div>
     </article>

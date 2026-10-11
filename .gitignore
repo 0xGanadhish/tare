@@ -50,3 +50,7 @@ contracts/broadcast/
 
 # Promo videos and their sources stay local
 /video/
+
+# playwright
+/test-results/
+/playwright-report/

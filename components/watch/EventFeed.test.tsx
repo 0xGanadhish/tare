@@ -43,6 +43,30 @@ describe('EventFeed', () => {
 describe('exit errors', () => {
   test('VerdictAlreadyUsed reads as already exited on this verdict', () => {
     render(<EventFeed network="testnet" connected events={[{ ...base, type: 'exit_failed', txHash: null, message: 'reverted: VerdictAlreadyUsed()' }]} positions={[]} />);
-    expect(screen.getByRole('alert').textContent).toMatch(/already exited on this verdict/);
+    expect(screen.getByRole('alert').textContent).toMatch(/already used/);
   });
+});
+
+describe('backend wording', () => {
+  test('backend partial message is not doubled', () => {
+    render(<EventFeed network="testnet" connected events={[{ ...base, type: 'exit_partial', message: 'Partly out: 12 USDC still locked' }]} positions={[]} />);
+    expect(screen.getByText(/Partly out · 12 USDC still locked/)).toBeTruthy();
+    expect(screen.queryByText(/Partly out · Partly out/)).toBeNull();
+  });
+  test('jev_unavailable gets a plain title', () => {
+    render(<EventFeed network="testnet" connected events={[{ ...base, type: 'jev_unavailable', txHash: null, message: 'Jev did not answer' }]} positions={[]} />);
+    expect(screen.getByText('Jev unavailable')).toBeTruthy();
+  });
+});
+
+describe('verdict floor wording', () => {
+  test('VerdictAlreadyUsed explains both causes', () => {
+    render(<EventFeed network="testnet" connected events={[{ ...base, type: 'exit_failed', txHash: null, message: 'VerdictAlreadyUsed()' }]} positions={[]} />);
+    expect(screen.getByRole('alert').textContent).toMatch(/rule changed after it/);
+  });
+});
+
+test('jev_unavailable is shown as a warning', () => {
+  render(<EventFeed network="testnet" connected events={[{ ...base, type: 'jev_unavailable', txHash: null, message: 'Jev is unreachable, so no verdict can be posted and Guardian cannot exit for you' }]} positions={[]} />);
+  expect(screen.getByRole('status').textContent).toMatch(/Guardian cannot exit for you/);
 });

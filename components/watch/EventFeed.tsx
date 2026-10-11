@@ -10,6 +10,7 @@ import { exitErrorText, partialDetail, type FeedEvent } from './feed';
 const TONE: Record<string, string> = {
   stats_changed: 'text-secondary',
   judged: 'text-ink',
+  jev_unavailable: 'text-avoid',
   posted: 'text-ink',
   alert: 'text-avoid',
   exit_sent: 'text-ink',
@@ -20,6 +21,7 @@ const TONE: Record<string, string> = {
 const TITLE: Record<string, string> = {
   stats_changed: 'Vault stats changed',
   judged: 'Jev judged',
+  jev_unavailable: 'Jev unavailable',
   posted: 'Verdict posted onchain',
   alert: 'Alert',
   exit_sent: 'Exit sent',
@@ -79,6 +81,10 @@ function EventRow({ e, position, network }: { e: FeedEvent; position?: PositionV
         <p className="mt-1 font-medium text-ink">
           You&apos;re out · confirmed in {secs ? `${secs}s` : 'one block'}
           {link}
+        </p>
+      ) : e.type === 'jev_unavailable' ? (
+        <p role="status" className="mt-1 rounded-lg border border-avoid/40 bg-avoid/5 px-3 py-2 text-ink">
+          {e.message}
         </p>
       ) : e.type === 'exit_failed' ? (
         <p role="alert" className="mt-1 font-medium text-avoid">
