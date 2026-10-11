@@ -1,0 +1,44 @@
+name = "tare-backend"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[triggers]
+# Pool scan every 10 min; resolver every minute (see CRON_* in src/index.ts).
+crons = ["*/10 * * * *", "* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tare"
+# Placeholder until Task 14 runs `wrangler d1 create tare`.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "STATE"
+bucket_name = "tare-ledger"
+
+[[queues.producers]]
+binding = "EXITS"
+queue = "tare-exits"
+
+[[queues.consumers]]
+queue = "tare-exits"
+max_batch_size = 10
+max_retries = 3
+dead_letter_queue = "tare-exits-dlq"
+
+[[durable_objects.bindings]]
+name = "VAULT_WATCHER"
+class_name = "VaultWatcher"
+
+[[durable_objects.bindings]]
+name = "TX_SENDER"
+class_name = "TxSender"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["VaultWatcher", "TxSender"]
