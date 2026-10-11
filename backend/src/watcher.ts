@@ -10,6 +10,7 @@ import { toOraclePost, type StateDocument } from '../../shared/verdict';
 import { postVerdict } from './archive';
 import { afterJudgment, decide } from './decide';
 import type { Env, ExitJob } from './env';
+import { realEnvioDeps, readFlows, readProtections } from './envio';
 import { addEvent } from './events';
 import { readVault } from './vaultReader';
 
@@ -119,10 +120,11 @@ export class VaultWatcher extends DurableObject<Env> {
     const env = this.env;
     // jev() reads the key from process.env; nodejs_compat populates it from bindings, this makes it explicit.
     if (env.TYPESAFE_API_KEY) process.env.TYPESAFE_API_KEY = env.TYPESAFE_API_KEY;
+    const envio = realEnvioDeps(env);
     return {
       readVault: (network, vault) => readVault(env, network, vault),
-      readFlows: async () => null, // Task 16
-      readProtections: async () => [], // Task 16
+      readFlows: (network, vault, reading) => readFlows(envio, network, vault.address as Address, Math.floor(Date.now() / 1000), reading.totalAssets),
+      readProtections: (network, vault) => readProtections(env.DB, envio, network, vault.address as Address),
       judge: (input) => judgePositionDetailed(input),
       post: (network, vault, judgment, doc) => postVerdict(env, network, vault, judgment, doc),
       enqueue: async (job) => { await env.EXITS.send(job); },
