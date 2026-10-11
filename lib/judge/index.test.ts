@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { judgePool, judgePosition, statsHash } from './index';
-import { JevUnavailable } from '../jev';
+import { judgePool, judgePosition, judgePositionDetailed, positionQuestions, statsHash } from './index';
+import { JEV_MODEL, JevUnavailable } from '../jev';
 import { renderPoolState, renderPositionState } from './state';
 import fixture from '../../fixtures/pools.json';
 import type { Pool, Position } from '../../shared/types';
@@ -92,4 +92,19 @@ test('real-vault state drops "(mirror)" and reports flows and liquidity', () => 
 test('state says when flow data is unavailable', () => {
   const text = renderPositionState({ ...input, ...realVault, flows: null });
   expect(text).toContain('flow data unavailable');
+});
+
+test('judgePositionDetailed returns the exact state, questions, answers and model for archiving', async () => {
+  const answers = {
+    action: { type: 'choice', choice: 'hold', confidence: 0.9, probabilities: { hold: 0.9, exit: 0.05, rotate: 0.05 } },
+    withdrawal_risk: { type: 'noul', noul: 0.1 }, yield_collapse: { type: 'noul', noul: 0.2 },
+  };
+  const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ answers }));
+  const detailed = await judgePositionDetailed(input, { fetchImpl });
+  expect(detailed.state).toBe(renderPositionState(input));
+  expect(detailed.questions).toBe(positionQuestions);
+  expect(detailed.answers).toEqual(answers);
+  expect(detailed.model).toBe(JEV_MODEL);
+  expect(detailed.judgment).toMatchObject({ action: { value: 'hold' }, withdrawalRisk: 0.1, yieldCollapse: 0.2 });
+  expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body)).model).toBe(JEV_MODEL);
 });

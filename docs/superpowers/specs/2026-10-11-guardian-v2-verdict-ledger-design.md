@@ -303,3 +303,13 @@ Because ERC-4626 events are standard, adding a vault means adding one address to
 | Attester key theft | Worst case is early exits to owners' own wallets. Rotate via `setAttester` |
 | Jev outage during demo | Testnet demo has a recorded fallback in the video |
 | Endpoint-only grading misses intra-window crunches | Documented on the Ledger. Continuous grading goes on the next slide |
+
+## Amendment (2026-10-11): contracts security review 1
+
+A fresh security review of Tasks 1-4 found no critical issues. These changes were made before any deploy:
+
+- **Reverting vaults (oracle).** `post` records the verdict even if the vault's or adapter's views revert (snapshot fields are 0). `resolve` grades a vault whose views revert as adverse with a new reason bit `REASON_BROKEN = 8`. To stop a caller starving the read of gas to fake that grade, `resolve` reverts with `InsufficientGas()` unless 100k gas remains after a failed read. New view `metricsOf(vault)`.
+- **Liquidity check overflow.** The liquidity floor uses `mulDiv` (rounded up), so an adapter returning `type(uint256).max` can't brick `resolve`.
+- **Verdict floor (GuardianV2).** New `verdictFloor(owner, vault)`. `enable` sets it to the oracle's current `postCount`, so a verdict from earlier in the same second no longer counts. A full exit (`remainingShares == 0`) sets it to that verdict's id, so one verdict can't be replayed against a re-deposit. A partial exit keeps the floor, so the exit can finish on the same verdict. This adds a seventh check, which reverts with `VerdictAlreadyUsed()`.
+- **Constructors.** Both constructors reject zero addresses, and the oracle also rejects a zero window (`ZeroArg()`). `disable` emits only when a rule was enabled.
+- **Known limitation, documented rather than fixed.** The TVL and liquidity criteria read a single moment, so anyone with flash liquidity can bend them at `resolve` time, and the first caller after the window picks that moment. To mitigate this, the backend resolves each post as soon as its window ends, and the Ledger page says that the TVL and liquidity grades are point-in-time. A time-averaged grade is post-hackathon work. The share-price criterion is robust, because EVK and MetaMorpho ignore direct donations.
