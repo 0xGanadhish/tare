@@ -7,7 +7,7 @@ import { EventFeed } from '@/components/watch/EventFeed';
 import { PositionCard } from '@/components/watch/PositionCard';
 import type { FeedEvent } from '@/components/watch/feed';
 import { useNetwork } from '@/components/network/NetworkProvider';
-import { fromJson, type PositionV2Json } from '@/lib/positions';
+import { fromJson, type PositionV2Json } from '@/lib/positionTypes';
 
 const MAX_EVENTS = 40;
 

@@ -25,3 +25,13 @@ export function partialDetail(e: FeedEvent): string | null {
   if (e.type === 'exit_confirmed' && e.message.includes('still locked')) return e.message.split(' · partial: ')[1] ?? e.message;
   return null;
 }
+
+/** Plain wording for Guardian revert reasons that reach the feed. */
+const EXIT_ERRORS: [string, string][] = [
+  ['VerdictAlreadyUsed', 'already exited on this verdict; Guardian waits for a newer EXIT verdict'],
+  ['StaleVerdict', 'the verdict was older than your freshness limit'],
+  ['BelowThreshold', "Jev's confidence was below your rule"],
+  ['VerdictPredatesEnable', 'the verdict was posted before you turned Guardian on'],
+  ['NothingToExit', 'nothing left to withdraw'],
+];
+export const exitErrorText = (message: string): string => EXIT_ERRORS.find(([k]) => message.includes(k))?.[1] ?? message;

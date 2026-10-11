@@ -5,7 +5,7 @@ import type { Network } from '@/shared/networks';
 import type { PositionV2 } from '@/lib/positions';
 import { txUrl, shortHash } from '@/components/tx/explorer';
 import { ExitButton } from './PositionCard';
-import { partialDetail, type FeedEvent } from './feed';
+import { exitErrorText, partialDetail, type FeedEvent } from './feed';
 
 const TONE: Record<string, string> = {
   stats_changed: 'text-secondary',
@@ -82,7 +82,7 @@ function EventRow({ e, position, network }: { e: FeedEvent; position?: PositionV
         </p>
       ) : e.type === 'exit_failed' ? (
         <p role="alert" className="mt-1 font-medium text-avoid">
-          Exit failed: {e.message}
+          Exit failed: {exitErrorText(e.message)}
         </p>
       ) : (
         <p className="mt-1 text-secondary">

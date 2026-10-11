@@ -39,3 +39,10 @@ describe('EventFeed', () => {
     expect(screen.getByRole('link').getAttribute('href')).toBe(`${NETWORKS.testnet.explorer}/tx/${hash}`);
   });
 });
+
+describe('exit errors', () => {
+  test('VerdictAlreadyUsed reads as already exited on this verdict', () => {
+    render(<EventFeed network="testnet" connected events={[{ ...base, type: 'exit_failed', txHash: null, message: 'reverted: VerdictAlreadyUsed()' }]} positions={[]} />);
+    expect(screen.getByRole('alert').textContent).toMatch(/already exited on this verdict/);
+  });
+});

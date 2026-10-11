@@ -1,21 +1,14 @@
-import { createPublicClient, http, isAddress, type Hex, type PublicClient } from 'viem';
+import { createPublicClient, http, isAddress, type PublicClient } from 'viem';
 import { abis } from '../shared/contracts';
-import { NETWORKS, UNDEPLOYED, type Network, type NetworkConfig, type VaultConfig } from '../shared/networks';
+import { NETWORKS, UNDEPLOYED, type Network, type NetworkConfig } from '../shared/networks';
 import type { Address } from '../shared/types';
+import { VERDICT_LABEL, type PositionV2 } from './positionTypes';
 import { serverBackend, type Backend } from './backend';
 import { InvalidAddress } from './idle';
+import { stateUrl } from './stateUrl';
 
-export type OracleVerdictLabel = 'HOLD' | 'EXIT' | 'MOVE';
-const VERDICT_LABEL: OracleVerdictLabel[] = ['HOLD', 'EXIT', 'MOVE'];
-
-export interface PositionV2 {
-  vault: VaultConfig;
-  shares: bigint;
-  assets: bigint;
-  rule: { enabled: boolean; minConfidenceBps: number; maxAge: number } | null;
-  /** Latest onchain verdict for the vault. `txHash` comes from the backend and is null while it is unreachable. */
-  latest: { id: string; verdict: OracleVerdictLabel; confidenceBps: number; postedAt: number; txHash: Hex | null; stateUrl: string | null } | null;
-}
+export type { OracleVerdictLabel, PositionV2, PositionV2Json } from './positionTypes';
+export { toJson, fromJson } from './positionTypes';
 
 export interface PositionDeps {
   config: NetworkConfig;
@@ -25,7 +18,6 @@ export interface PositionDeps {
   stateBaseUrl: string | null;
 }
 
-export const stateUrl = (base: string | null, hash: string): string | null => (base ? `${base.replace(/\/+$/, '')}/state/${hash}.json` : null);
 
 function defaultDeps(network: Network): PositionDeps {
   const config = NETWORKS[network];
@@ -77,8 +69,3 @@ export async function readPositions(network: Network, owner: Address, deps: Posi
   }));
   return positions.filter((p): p is PositionV2 => p !== null);
 }
-
-/** JSON-safe form for the API route (bigints as decimal strings). */
-export type PositionV2Json = Omit<PositionV2, 'shares' | 'assets'> & { shares: string; assets: string };
-export const toJson = (p: PositionV2): PositionV2Json => ({ ...p, shares: p.shares.toString(), assets: p.assets.toString() });
-export const fromJson = (p: PositionV2Json): PositionV2 => ({ ...p, shares: BigInt(p.shares), assets: BigInt(p.assets) });

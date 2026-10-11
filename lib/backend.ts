@@ -1,4 +1,7 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { Network } from '../shared/networks';
+import { scoreLedger } from '../shared/score';
 import type { Address, Pool, Verdict } from '../shared/types';
 
 /** One row of `posts` as the backend serves it (backend/src/api.ts `toVerdict`). `verdict` is the oracle enum: 0 HOLD, 1 EXIT, 2 MOVE. */
@@ -14,10 +17,8 @@ export interface BackendEvent {
   txHash: `0x${string}` | null; confidence: number | null; at: string;
 }
 
-export interface LedgerScore {
-  n: number; brier: number | null; early: boolean;
-  bands: { band: '80-89' | '90-94' | '95-100' | '<80'; n: number; hitRate: number | null }[];
-}
+export type { LedgerScore } from '../shared/score';
+import type { LedgerScore } from '../shared/score';
 
 export interface Market { pools: Pool[]; verdicts: Record<string, Verdict>; asOf: string | null }
 
@@ -68,6 +69,43 @@ export function createBackend(baseUrl: string, fetchFn: FetchFn = (url, init) =>
 }
 
 export type Backend = ReturnType<typeof createBackend>;
+
+const VERDICT_NAMES = ['HOLD', 'EXIT', 'MOVE'] as const;
+
+/**
+ * Offline stand-in for the read API (DATA_SOURCE=fixtures): serves fixtures/verdicts-ledger.json, which holds sample
+ * rows, not real verdicts. Pages that show it say so (`source: 'fixtures'`).
+ */
+export function fixtureBackend(dir = process.env.FIXTURES_DIR ?? join(process.cwd(), 'fixtures')): Backend {
+  const rows = async () => (JSON.parse(await readFile(join(dir, 'verdicts-ledger.json'), 'utf8')) as { verdicts: LedgerVerdict[] }).verdicts;
+  const newest = async (network: Network, vault?: string) =>
+    (await rows()).filter((r) => r.network === network && (!vault || r.vault.toLowerCase() === vault.toLowerCase())).sort((a, b) => b.id - a.id);
+  return {
+    pools: async () => {
+      const [pools, verdicts] = await Promise.all(['pools', 'verdicts'].map(async (f) => JSON.parse(await readFile(join(dir, `${f}.json`), 'utf8'))));
+      return { pools: pools.pools, verdicts, asOf: pools.asOf };
+    },
+    pool: async () => null,
+    verdicts: async ({ network, vault, cursor, limit }) => {
+      const size = Math.min(100, Math.max(1, limit ?? 50));
+      const all = (await newest(network, vault)).filter((r) => !cursor || r.id < Number(cursor));
+      const page = all.slice(0, size);
+      return { verdicts: page, cursor: all.length > size ? String(page[page.length - 1].id) : null };
+    },
+    latest: async (network, vault) => (await newest(network, vault))[0] ?? null,
+    events: async () => [],
+    score: async (network) => scoreLedger((await newest(network)).filter((r) => !r.drill).map((r) => ({
+      verdict: VERDICT_NAMES[r.verdict] ?? 'HOLD', confidenceBps: r.confidenceBps, riskBps: r.riskBps, resolved: r.resolved, adverse: r.adverse,
+    }))),
+  };
+}
+
+/** Where server routes read ledger data: fixtures when DATA_SOURCE=fixtures, else BACKEND_URL, else nothing configured. */
+export function ledgerSource(): { backend: Backend; source: 'fixtures' | 'backend' } | null {
+  if (process.env.DATA_SOURCE === 'fixtures') return { backend: fixtureBackend(), source: 'fixtures' };
+  const backend = serverBackend();
+  return backend ? { backend, source: 'backend' } : null;
+}
 
 /** Server-side client from BACKEND_URL, or null when no backend is configured. */
 export function serverBackend(): Backend | null {
