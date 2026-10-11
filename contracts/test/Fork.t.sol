@@ -73,6 +73,8 @@ contract ForkTest is Test {
             assertEq(IERC20(USDC).balanceOf(address(guardian)), 0);
             assertEq(IERC20(vault).balanceOf(address(guardian)), 0);
             assertEq(IERC20(USDC).balanceOf(caller), 0);
+            assertEq(IERC20(vault).balanceOf(user), 0, "full exit, no dust");
+            assertEq(guardian.verdictFloor(user, vault), oracle.latest(vault), "verdict consumed");
         }
     }
 

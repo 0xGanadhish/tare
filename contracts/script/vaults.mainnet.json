@@ -1,3 +1,18 @@
 {
-  "vaults": []
+  "vaults": [
+    {
+      "address": "0xE1BcA19baA63894D374578320551633320436523",
+      "name": "Clearstar Earn USDC",
+      "protocol": "euler",
+      "poolId": "d711af54-e736-470f-8a22-431a23de76df",
+      "adapter": "none"
+    },
+    {
+      "address": "0x80017bF0f793EBbE9679Cd61ff0e395B62CAbB59",
+      "name": "August USDC V2",
+      "protocol": "morpho",
+      "poolId": "0b033747-3a22-486b-a600-9958b878bef7",
+      "adapter": "none"
+    }
+  ]
 }
