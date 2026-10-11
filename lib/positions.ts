@@ -12,7 +12,7 @@ export { toJson, fromJson } from './positionTypes';
 
 export interface PositionDeps {
   config: NetworkConfig;
-  client: Pick<PublicClient, 'readContract'>;
+  client: Pick<PublicClient, 'readContract' | 'simulateContract'>;
   backend: Pick<Backend, 'latest'> | null;
   /** Public R2 base for archived state documents ("what Jev saw"). */
   stateBaseUrl: string | null;
@@ -47,6 +47,19 @@ async function latestVerdict(deps: PositionDeps, network: Network, vault: Addres
   };
 }
 
+/**
+ * Shares the owner can redeem right now. Real vaults under-report maxRedeem (Morpho Vault V2 always
+ * returns 0; Euler Earn returns one share short), so try the full balance first, like GuardianV2.exit.
+ */
+async function redeemableShares(client: PositionDeps['client'], vault: Address, owner: Address, shares: bigint): Promise<bigint> {
+  try {
+    await client.simulateContract({ address: vault, abi: abis.erc4626, functionName: 'redeem', args: [shares, owner, owner], account: owner });
+    return shares;
+  } catch {
+    return client.readContract({ address: vault, abi: abis.erc4626, functionName: 'maxRedeem', args: [owner] });
+  }
+}
+
 /** The owner's positions in the network's Tare vaults, with their Guardian rule and the latest onchain verdict. */
 export async function readPositions(network: Network, owner: Address, deps: PositionDeps = defaultDeps(network)): Promise<PositionV2[]> {
   if (!isAddress(owner)) throw new InvalidAddress();
@@ -56,7 +69,7 @@ export async function readPositions(network: Network, owner: Address, deps: Posi
     if (shares === 0n) return null;
     const [assets, redeemable, rule, latest] = await Promise.all([
       client.readContract({ address: vault.address, abi: abis.erc4626, functionName: 'convertToAssets', args: [shares] }),
-      client.readContract({ address: vault.address, abi: abis.erc4626, functionName: 'maxRedeem', args: [owner] }),
+      redeemableShares(client, vault.address, owner, shares),
       config.guardian === UNDEPLOYED
         ? null
         : client.readContract({ address: config.guardian, abi: abis.guardianV2, functionName: 'rules', args: [owner, vault.address] }),

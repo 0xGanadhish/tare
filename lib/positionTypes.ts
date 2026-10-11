@@ -9,7 +9,7 @@ export interface PositionV2 {
   vault: VaultConfig;
   shares: bigint;
   assets: bigint;
-  /** maxRedeem(owner): shares the vault lets the owner redeem right now. */
+  /** Shares the owner can redeem right now: the full balance if a full redeem simulates, else maxRedeem(owner). */
   redeemable: bigint;
   rule: { enabled: boolean; minConfidenceBps: number; maxAge: number } | null;
   /** Latest onchain verdict for the vault. `txHash` comes from the backend and is null while it is unreachable. */

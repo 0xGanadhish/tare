@@ -13,6 +13,7 @@ const txHash = `0x${'cd'.repeat(32)}` as const;
 const config = (over: Partial<NetworkConfig> = {}): NetworkConfig => ({ ...NETWORKS.testnet, vaults: [vaultA, vaultB], guardian, oracle, ...over });
 
 let readContract: ReturnType<typeof vi.fn>;
+let simulateContract: ReturnType<typeof vi.fn>;
 let latest: ReturnType<typeof vi.fn>;
 let deps: PositionDeps;
 
@@ -26,8 +27,10 @@ beforeEach(() => {
     if (functionName === 'getPost') return { vault: vaultA.address, verdict: 1, confidenceBps: 9300, riskBps: 8800, stateHash, postedAt: 1_760_000_100n, ppsAtPost: 0n, assetsAtPost: 0n, liquidityAtPost: 0n };
     throw new Error(`unexpected ${functionName}`);
   });
+  // Default: the vault rejects a full redeem (partly locked), so redeemable falls back to maxRedeem.
+  simulateContract = vi.fn(async () => { throw new Error('ERC4626ExceededMaxRedeem'); });
   latest = vi.fn(async () => ({ id: 7, txHash }));
-  deps = { config: config(), client: { readContract } as unknown as PositionDeps['client'], backend: { latest } as unknown as PositionDeps['backend'], stateBaseUrl: 'https://state.example' };
+  deps = { config: config(), client: { readContract, simulateContract } as unknown as PositionDeps['client'], backend: { latest } as unknown as PositionDeps['backend'], stateBaseUrl: 'https://state.example' };
 });
 
 test('rejects an invalid owner before any RPC', async () => {
@@ -70,4 +73,18 @@ test('backend down still returns the onchain verdict, without a tx hash', async 
   latest.mockRejectedValue(new Error('down'));
   const [p] = await readPositions('testnet', owner, deps);
   expect(p.latest).toMatchObject({ id: '7', verdict: 'EXIT', txHash: null });
+});
+
+test('a vault that accepts a full redeem is fully redeemable even when maxRedeem under-reports (Morpho V2 returns 0)', async () => {
+  simulateContract.mockResolvedValue({ result: 5_100_000n });
+  readContract.mockImplementation(async ({ address, functionName }: { address: string; functionName: string }) =>
+    ({ balanceOf: address === vaultA.address ? 5_000_000n : 0n, convertToAssets: 5_100_000n, maxRedeem: 0n, rules: [false, 0, 0, 0n], latest: 0n } as Record<string, unknown>)[functionName]);
+  const [p] = await readPositions('testnet', owner, deps);
+  expect(p.redeemable).toBe(5_000_000n);
+  expect(simulateContract).toHaveBeenCalledWith(expect.objectContaining({ address: vaultA.address, functionName: 'redeem', args: [5_000_000n, owner, owner], account: owner }));
+});
+
+test('a vault that rejects a full redeem falls back to maxRedeem', async () => {
+  const [p] = await readPositions('testnet', owner, deps);
+  expect(p.redeemable).toBe(3_000_000n);
 });
