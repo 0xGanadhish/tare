@@ -20,13 +20,13 @@ contracts:
       - event: Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares)
       - event: Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares)
 chains:
-  - id: 10143 # Monad testnet (placeholders: oracle, guardianV2, deployBlockV2, vaults)
-    start_block: 0
+  - id: 10143 # Monad testnet
+    start_block: 70225943
     contracts:
       - name: TareRiskOracle
-        address: "0x00000000000000000000000000000000000a11ce"
+        address: "0x9fE598a6D7BD9073ea871FB80E2B05Aa58768405"
       - name: GuardianV2
-        address: "0x00000000000000000000000000000000000b0b00"
+        address: "0x470D2Ee28054C250238Da0E2fD66D69438BEDf8c"
       - name: ERC4626Vault
         address:
           - "0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC"

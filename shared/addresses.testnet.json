@@ -1,6 +1,8 @@
 {
-  "mockUsdc": "0xd535a4068265b383976d92718e3E650b5183b6Ab",
+  "deployBlockV2": 70225943,
   "guardian": "0x0F22A6b6E5FB8bda0e85e5034DEaC069c8d5e8DF",
+  "guardianV2": "0x470D2Ee28054C250238Da0E2fD66D69438BEDf8c",
+  "launchFactory": "0x6Ef1ca2A0c8B918429b78d8E9C8A8fc5F9970F1F",
   "mirrors": [
     {
       "address": "0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC",
@@ -23,5 +25,37 @@
       "poolId": "e259a7bc-d2b0-41e5-b12d-a3c7b984560c"
     }
   ],
-  "launchFactory": "0x6Ef1ca2A0c8B918429b78d8E9C8A8fc5F9970F1F"
+  "mockUsdc": "0xd535a4068265b383976d92718e3E650b5183b6Ab",
+  "oracle": "0x9fE598a6D7BD9073ea871FB80E2B05Aa58768405",
+  "usdc": "0xd535a4068265b383976d92718e3E650b5183b6Ab",
+  "vaults": [
+    {
+      "address": "0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC",
+      "name": "Clearstar USDC · Euler",
+      "poolId": "d711af54-e736-470f-8a22-431a23de76df",
+      "protocol": "mirror",
+      "adapter": "0x117F6d23786A9d373c3ac26E29dc20618EF9c8de"
+    },
+    {
+      "address": "0x7c1c54fD8ae0bEC3a9D15A60DF4F0777298F6609",
+      "name": "K3 Capital Earn · Euler",
+      "poolId": "f234d4dc-9b36-4b23-b1ad-ab73e8286b56",
+      "protocol": "mirror",
+      "adapter": "0x117F6d23786A9d373c3ac26E29dc20618EF9c8de"
+    },
+    {
+      "address": "0x92b4e57F3DD6450C65a45d081D0e97d5f5f9aA43",
+      "name": "August USDC v2 · Morpho",
+      "poolId": "0b033747-3a22-486b-a600-9958b878bef7",
+      "protocol": "mirror",
+      "adapter": "0x117F6d23786A9d373c3ac26E29dc20618EF9c8de"
+    },
+    {
+      "address": "0x0c12De3767B22573b96510aCf67B5D298990B227",
+      "name": "Anemoy Apollo Credit · Centrifuge",
+      "poolId": "e259a7bc-d2b0-41e5-b12d-a3c7b984560c",
+      "protocol": "mirror",
+      "adapter": "0x117F6d23786A9d373c3ac26E29dc20618EF9c8de"
+    }
+  ]
 }
