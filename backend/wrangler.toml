@@ -13,8 +13,7 @@ crons = ["*/10 * * * *", "* * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "tare"
-# Placeholder until Task 14 runs `wrangler d1 create tare`.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "8f2152d3-a58e-42ba-a344-5be68845aaf0"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
