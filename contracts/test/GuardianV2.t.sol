@@ -7,6 +7,37 @@ import {MirrorVault} from "../src/MirrorVault.sol";
 import {MirrorAdapter} from "../src/adapters/MirrorAdapter.sol";
 import {TareRiskOracle} from "../src/TareRiskOracle.sol";
 import {GuardianV2} from "../src/GuardianV2.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+/// Mimics real mainnet vaults whose maxRedeem under-reports what redeem accepts:
+/// Morpho Vault V2 always returns 0; Euler Earn returns balance - 1. `locked` makes redeem revert.
+contract QuirkyVault is ERC4626 {
+    enum Mode { ZeroMax, OneShort }
+    Mode public mode;
+    bool public locked;
+
+    constructor(IERC20 asset_, Mode mode_) ERC20("Quirky", "qUSDC") ERC4626(asset_) {
+        mode = mode_;
+    }
+
+    function setLocked(bool l) external {
+        locked = l;
+    }
+
+    function maxRedeem(address owner) public view override returns (uint256) {
+        uint256 b = balanceOf(owner);
+        if (locked || mode == Mode.ZeroMax || b == 0) return 0;
+        return b - 1;
+    }
+
+    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256 assets) {
+        require(!locked, "locked");
+        assets = previewRedeem(shares);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+    }
+}
 
 contract GuardianV2Test is Test {
     event Exited(
@@ -313,5 +344,52 @@ contract GuardianV2Test is Test {
         assertEq(usdc.balanceOf(who), callerBefore);
         assertEq(usdc.balanceOf(address(guardian)), 0);
         assertEq(vault.balanceOf(address(guardian)), 0);
+    }
+
+    // --- vaults whose maxRedeem under-reports (Morpho Vault V2, Euler Earn) ---
+
+    function _quirky(QuirkyVault.Mode mode) internal returns (QuirkyVault q, uint256 id) {
+        q = new QuirkyVault(usdc, mode);
+        vm.prank(oracleOwner);
+        oracle.registerVault(address(q), address(0));
+        vm.prank(admin);
+        guardian.setVaultApproved(address(q), true);
+        usdc.mint(user, 1_000e6);
+        vm.startPrank(user);
+        usdc.approve(address(q), 1_000e6);
+        q.deposit(1_000e6, user);
+        q.approve(address(guardian), type(uint256).max);
+        guardian.enable(address(q), 9000, 600);
+        vm.stopPrank();
+        vm.prank(attester);
+        id = oracle.post(address(q), TareRiskOracle.Verdict.EXIT, 9500, 8000, keccak256("state"));
+    }
+
+    function test_exit_vaultReportingZeroMaxRedeem_exitsInFull() public {
+        (QuirkyVault q, uint256 id) = _quirky(QuirkyVault.Mode.ZeroMax);
+        uint256 before = usdc.balanceOf(user);
+        vm.prank(caller);
+        assertEq(guardian.exit(address(q), user), 1_000e6);
+        assertEq(usdc.balanceOf(user) - before, 1_000e6);
+        assertEq(q.balanceOf(user), 0);
+        assertEq(guardian.verdictFloor(user, address(q)), id);
+    }
+
+    function test_exit_vaultUnderReportingMaxRedeemByOne_exitsInFull() public {
+        (QuirkyVault q, uint256 id) = _quirky(QuirkyVault.Mode.OneShort);
+        vm.expectEmit(address(guardian));
+        emit Exited(user, address(q), id, caller, 1_000e6, 1_000e6, 0);
+        vm.prank(caller);
+        guardian.exit(address(q), user);
+        assertEq(q.balanceOf(user), 0);
+        assertEq(guardian.verdictFloor(user, address(q)), id);
+    }
+
+    function test_exit_lockedVault_nothingToExit() public {
+        (QuirkyVault q,) = _quirky(QuirkyVault.Mode.OneShort);
+        q.setLocked(true);
+        vm.expectRevert(GuardianV2.NothingToExit.selector);
+        guardian.exit(address(q), user);
+        assertEq(q.balanceOf(user), 1_000e6);
     }
 }

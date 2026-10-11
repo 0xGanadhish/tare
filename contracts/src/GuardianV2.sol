@@ -89,17 +89,24 @@ contract GuardianV2 {
     }
 
     /// @notice Redeem `owner`'s shares back to `owner` when the rule's conditions hold. Callable by anyone.
+    /// @dev Tries the full position first, because real vaults under-report maxRedeem (Morpho Vault V2
+    /// always returns 0; Euler Earn returns one share short). Falls back to maxRedeem for a partial exit.
     function exit(address vault, address owner) external returns (uint256 assets) {
         uint256 id = _checkVerdict(vault, owner);
 
         uint256 shares = IERC20(vault).balanceOf(owner);
-        uint256 m = IERC4626(vault).maxRedeem(owner);
-        if (m < shares) shares = m;
         uint256 a = IERC20(vault).allowance(owner, address(this));
         if (a < shares) shares = a;
         if (shares == 0) revert NothingToExit();
 
-        assets = IERC4626(vault).redeem(shares, owner, owner);
+        try IERC4626(vault).redeem(shares, owner, owner) returns (uint256 got) {
+            assets = got;
+        } catch {
+            uint256 m = IERC4626(vault).maxRedeem(owner);
+            if (m < shares) shares = m;
+            if (shares == 0) revert NothingToExit();
+            assets = IERC4626(vault).redeem(shares, owner, owner);
+        }
         uint256 remaining = IERC20(vault).balanceOf(owner);
         if (remaining == 0) verdictFloor[owner][vault] = id;
         emit Exited(owner, vault, id, msg.sender, shares, assets, remaining);
