@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { NETWORKS } from '@/shared/networks';
-import { slipAction } from './slipAction';
+import { slipAction } from './slipActionKind';
 
 const mirrored = NETWORKS.testnet.vaults.find((v) => v.poolId)!;
 

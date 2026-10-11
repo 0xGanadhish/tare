@@ -5,7 +5,7 @@ import { protocolUrl } from '@/shared/protocols';
 import { formatProject } from '@/components/field/format';
 import { DepositFlow } from '@/components/advisor/DepositFlow';
 import { useNetwork } from '@/components/network/NetworkProvider';
-import { slipAction } from './slipAction';
+import { slipAction } from './slipActionKind';
 
 /** The slip's action slot: Deposit into the pool's vault on this network, else a link to the protocol. */
 export function SlipAction({ pool, defaultAmount }: { pool: Pool; defaultAmount?: number | null }) {

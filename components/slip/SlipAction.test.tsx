@@ -8,7 +8,7 @@ import type { Pool } from '@/shared/types';
 const net = vi.hoisted(() => ({ network: 'testnet' as Network, mounts: 0 }));
 const vault = { address: '0x2222222222222222222222222222222222222222', name: 'V', poolId: 'p1', protocol: 'euler', adapter: null } as const;
 vi.mock('@/components/network/NetworkProvider', () => ({ useNetwork: () => ({ network: net.network, config: NETWORKS[net.network] }) }));
-vi.mock('./slipAction', () => ({ slipAction: () => ({ kind: 'deposit', vault }) }));
+vi.mock('./slipActionKind', () => ({ slipAction: () => ({ kind: 'deposit', vault }) }));
 vi.mock('@/components/advisor/DepositFlow', () => ({
   DepositFlow: () => { useEffect(() => { net.mounts += 1; }, []); return null; },
 }));
