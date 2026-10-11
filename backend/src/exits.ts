@@ -60,7 +60,7 @@ async function processJob(env: Env, job: ExitJob, attempts: number, deps: ExitDe
     const reason = await deps.simulate(job);
     if (reason !== null) {
       await update(`status = 'skipped', error = ?`, reason);
-      await addEvent(env.DB, { network, vault: job.vault, owner, type: 'exit_skipped', message: `Guardian did not exit: ${reason}` });
+      await addEvent(env.DB, { network, vault: job.vault, owner, type: 'exit_failed', message: `Guardian did not exit: ${reason}` });
       log('exit_skipped', { reason });
       return { ack: true };
     }
@@ -73,8 +73,12 @@ async function processJob(env: Env, job: ExitJob, attempts: number, deps: ExitDe
     const { shares = 0n, assets = 0n, remainingShares = 0n } = exited?.args ?? {};
     await update(`status = 'confirmed', tx_hash = ?, assets = ?, remaining_shares = ?`, receipt.hash, assets.toString(), remainingShares.toString());
     // Remaining shares valued at this exit's own share price, so no extra RPC is needed for the message.
-    const message = remainingShares === 0n || shares === 0n ? "You're out" : `Partly out: ${usdc((remainingShares * assets) / shares)} USDC still locked`;
-    await addEvent(env.DB, { network, vault: job.vault, owner, type: 'exit_confirmed', message, txHash: receipt.hash });
+    const partial = remainingShares > 0n && shares > 0n;
+    await addEvent(env.DB, {
+      network, vault: job.vault, owner, txHash: receipt.hash,
+      type: partial ? 'exit_partial' : 'exit_confirmed',
+      message: partial ? `Partly out: ${usdc((remainingShares * assets) / shares)} USDC still locked` : "You're out",
+    });
     log('exit_confirmed', { txHash: receipt.hash });
     return { ack: true };
   } catch (err) {
@@ -82,7 +86,7 @@ async function processJob(env: Env, job: ExitJob, attempts: number, deps: ExitDe
     await update(`status = 'failed', error = ?`, message);
     log('exit_attempt_failed', { attempts, error: message });
     if (attempts < MAX_ATTEMPTS) return { ack: false, delaySeconds: 2 ** attempts };
-    await addEvent(env.DB, { network, vault: job.vault, owner, type: 'exit_failed', message: 'Guardian could not exit for you. Exit manually from Watch.' });
+    await addEvent(env.DB, { network, vault: job.vault, owner, type: 'exit_failed', message: `Guardian could not exit for you (${message}). Exit manually from Watch.` });
     return { ack: true };
   }
 }

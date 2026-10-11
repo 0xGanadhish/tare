@@ -75,6 +75,10 @@ describe('VaultWatcher', () => {
     expect([network, vault, judgment.action.value]).toEqual(['testnet', MIRROR, 'exit']);
     expect(doc).toMatchObject({ v: 1, network: 'testnet', vault: MIRROR, state: 'state text', answers: { a: 1 }, model: 'jev-latest', drill: false });
     expect(calls.jobs).toEqual([{ network: 'testnet', vault: MIRROR, owner: OWNER_A, verdictId: '7' }]);
+    const feed = await events();
+    expect(feed.filter((e) => e.owner === OWNER_A.toLowerCase()).map((e) => e.type).sort()).toEqual(['exit_sent', 'posted']);
+    expect(feed.filter((e) => e.owner === OWNER_B.toLowerCase()).map((e) => e.type).sort()).toEqual(['alert', 'posted']);
+    expect(feed.filter((e) => e.owner === null).map((e) => e.type).sort()).toEqual(['alert', 'judged']);
     const health = await env.DB.prepare('SELECT last_post_at, last_error FROM vault_health WHERE network = ? AND vault = ?').bind('testnet', MIRROR.toLowerCase()).first();
     expect(health?.last_post_at).not.toBeNull();
     expect(health?.last_error).toBeNull();

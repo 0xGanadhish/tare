@@ -94,10 +94,24 @@ describe('read API', () => {
     expect(after.events.map((e) => e.id)).toEqual(['e2']);
   });
 
-  it('/v1/ledger/score returns the stub score', async () => {
+  it('/v1/ledger/score scores resolved, non-drill posts by verdict', async () => {
+    const add = (id: number, verdict: number, conf: number, adverse: number | null, drill = 0) => env.DB.prepare(`INSERT INTO posts
+      (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at, resolved, adverse, drill) VALUES ('testnet', ?, ?, ?, ?, 5000, '0x', 1, ?, ?, ?)`)
+      .bind(id, VAULT, verdict, conf, adverse === null ? 0 : 1, adverse, drill).run();
+    await add(1, 1, 9600, 1); // EXIT then adverse: hit
+    await add(2, 0, 9600, 1); // HOLD then adverse: miss
+    await add(3, 1, 8500, null); // unresolved
+    await add(4, 1, 9600, 0, 1); // drill: excluded
     const res = await get('/v1/ledger/score?network=testnet');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ n: 0, brier: null, early: true, bands: [] });
+    const body = await res.json<{ n: number; brier: number; early: boolean; bands: { band: string; n: number; hitRate: number | null }[] }>();
+    expect(body.n).toBe(2);
+    expect(body.brier).toBeCloseTo(0.25);
+    expect(body.early).toBe(true);
+    expect(body.bands).toEqual([
+      { band: '<80', n: 0, hitRate: null }, { band: '80-89', n: 0, hitRate: null },
+      { band: '90-94', n: 0, hitRate: null }, { band: '95-100', n: 2, hitRate: 0.5 },
+    ]);
   });
 
   it('unknown route → 404 JSON', async () => {

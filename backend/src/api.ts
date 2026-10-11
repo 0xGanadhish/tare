@@ -5,6 +5,7 @@ import { scoreLedger } from './score';
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const MAX_LIMIT = 100;
+const VERDICT_NAMES = ['HOLD', 'EXIT', 'MOVE'] as const;
 
 interface PostRow {
   network: Network; id: number; vault: string; verdict: number; confidence_bps: number; risk_bps: number;
@@ -72,10 +73,10 @@ async function events(env: Env, network: Network, owner: string, since: string |
 }
 
 async function score(env: Env, network: Network): Promise<Response> {
-  const { results } = await env.DB.prepare('SELECT confidence_bps, risk_bps, resolved, adverse FROM posts WHERE network = ? AND drill = 0')
-    .bind(network).all<Pick<PostRow, 'confidence_bps' | 'risk_bps' | 'resolved' | 'adverse'>>();
+  const { results } = await env.DB.prepare('SELECT verdict, confidence_bps, risk_bps, resolved, adverse FROM posts WHERE network = ? AND drill = 0')
+    .bind(network).all<Pick<PostRow, 'verdict' | 'confidence_bps' | 'risk_bps' | 'resolved' | 'adverse'>>();
   return json(scoreLedger(results.map((r) => ({
-    confidenceBps: r.confidence_bps, riskBps: r.risk_bps, resolved: r.resolved === 1, adverse: r.adverse === null ? null : r.adverse === 1,
+    verdict: VERDICT_NAMES[r.verdict], confidenceBps: r.confidence_bps, riskBps: r.risk_bps, resolved: r.resolved === 1, adverse: r.adverse === null ? null : r.adverse === 1,
   }))));
 }
 

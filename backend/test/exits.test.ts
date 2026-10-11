@@ -77,7 +77,7 @@ describe('exit consumer', () => {
     expect(sent).toHaveLength(0);
     expect(result.explicitAcks).toEqual(['m0']);
     expect(await env.DB.prepare('SELECT status, error FROM exits').first()).toEqual({ status: 'skipped', error: 'StaleVerdict' });
-    expect((await eventsOf())[0].type).toBe('exit_skipped');
+    expect((await eventsOf())[0]).toMatchObject({ type: 'exit_failed', message: expect.stringContaining('StaleVerdict') });
   });
 
   it('partial exit → event says "Partly out"', async () => {
@@ -86,7 +86,7 @@ describe('exit consumer', () => {
     });
     await run([{ body: job }], deps);
     const [event] = await eventsOf();
-    expect(event).toMatchObject({ type: 'exit_confirmed', owner: OWNER, message: 'Partly out: 400 USDC still locked' });
+    expect(event).toMatchObject({ type: 'exit_partial', owner: OWNER, message: 'Partly out: 400 USDC still locked' });
   });
 
   it('send throws → retried with backoff', async () => {
@@ -103,6 +103,14 @@ describe('exit consumer', () => {
     expect(result.retryMessages).toEqual([]);
     expect(result.explicitAcks).toEqual(['m0']);
     expect((await eventsOf()).map((e) => e.type)).toEqual(['exit_failed']);
+    expect((await eventsOf())[0].message).toContain('rpc timeout');
+  });
+
+  it('simulated VerdictAlreadyUsed → skipped, no send', async () => {
+    const { deps, sent } = fakeDeps({ simulate: async () => 'VerdictAlreadyUsed' });
+    await run([{ body: job }], deps);
+    expect(sent).toHaveLength(0);
+    expect(await env.DB.prepare('SELECT status, error FROM exits').first()).toEqual({ status: 'skipped', error: 'VerdictAlreadyUsed' });
   });
 
   it('a retry after a failed attempt sends again', async () => {

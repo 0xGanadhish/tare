@@ -61,10 +61,13 @@ export async function watchOnce(db: D1Database, vault: VaultConfig, network: Net
     const post = toOraclePost(detail.judgment);
     await addEvent(db, { network, vault: address, type: 'judged', message: `Jev: ${detail.judgment.action.value} at ${pct(post.confidenceBps)}`, txHash, confidence: detail.judgment.action.confidence });
     const protections = await deps.readProtections(network, vault);
+    for (const { owner } of protections) {
+      await addEvent(db, { network, vault: address, owner, type: 'posted', message: `Verdict #${id} posted onchain: ${detail.judgment.action.value} at ${pct(post.confidenceBps)}`, txHash, confidence: detail.judgment.action.confidence });
+    }
     const { enqueue, alert } = afterJudgment(post, protections);
     for (const owner of enqueue) {
       await deps.enqueue({ network, vault: address, owner, verdictId: id.toString() });
-      await addEvent(db, { network, vault: address, owner, type: 'exit_queued', message: `Guardian is pulling you out (Jev ${pct(post.confidenceBps)} sure)`, txHash, confidence: detail.judgment.action.confidence });
+      await addEvent(db, { network, vault: address, owner, type: 'exit_sent', message: `Guardian is pulling you out (Jev ${pct(post.confidenceBps)} sure)`, txHash, confidence: detail.judgment.action.confidence });
     }
     if (alert) {
       const queued = new Set(enqueue.map((o) => o.toLowerCase()));
