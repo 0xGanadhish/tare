@@ -1,6 +1,7 @@
 import { handleAdmin } from './admin';
 import { handleRead } from './api';
-import type { Env } from './env';
+import type { Env, ExitJob } from './env';
+import { handleExitBatch } from './exits';
 import { error } from './http';
 
 export default {
@@ -12,7 +13,10 @@ export default {
       return error(500, 'internal');
     }
   },
-} satisfies ExportedHandler<Env>;
+  async queue(batch, env) {
+    await handleExitBatch(batch, env);
+  },
+} satisfies ExportedHandler<Env, ExitJob>;
 
 export { VaultWatcher } from "./watcher";
 export { TxSender } from "./txSender";
