@@ -77,7 +77,7 @@ importers:
     dependencies:
       envio:
         specifier: 3.0.0-alpha.21
-        version: 3.0.0-alpha.21(@types/react@19.3.0)(bufferutil@4.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.5)
+        version: 3.0.0-alpha.21(@types/react@19.3.0)(bufferutil@4.1.0)(react-dom@19.1.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.5)
       viem:
         specifier: ^2.57.4
         version: 2.57.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.5)
@@ -95,6 +95,39 @@ importers:
       generated:
         specifier: ./generated
         version: link:generated
+
+  indexer/generated:
+    dependencies:
+      bignumber.js:
+        specifier: 9.3.1
+        version: 9.3.1
+      date-fns:
+        specifier: 3.3.1
+        version: 3.3.1
+      envio:
+        specifier: 3.0.0-alpha.21
+        version: 3.0.0-alpha.21(@types/react@19.3.0)(bufferutil@4.1.0)(react-dom@19.1.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.5)
+      js-sdsl:
+        specifier: 4.4.2
+        version: 4.4.2
+      pino:
+        specifier: 8.16.1
+        version: 8.16.1
+      prom-client:
+        specifier: 15.1.3
+        version: 15.1.3
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      rescript:
+        specifier: 11.1.3
+        version: 11.1.3
+      rescript-schema:
+        specifier: 9.3.4
+        version: 9.3.4(rescript@11.1.3)
+      viem:
+        specifier: 2.46.2
+        version: 2.46.2(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.5)
 
 packages:
 
@@ -2337,6 +2370,10 @@ packages:
       zod:
         optional: true
 
+  abort-controller@3.0.0:
+    resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
+    engines: {node: '>=6.5'}
+
   accepts@1.3.8:
     resolution: {integrity: sha512-PYAthTa2m2VKxuvSD3DPC/Gy+U+sOA1LAuT8mkmRuvw+NACSaeXEQ+NHcVF7rONl6qcaxV3Uuemwawk+7+SJLw==}
     engines: {node: '>= 0.6'}
@@ -3138,6 +3175,10 @@ packages:
   ethereum-cryptography@2.2.1:
     resolution: {integrity: sha512-r/W8lkHSiTLxUxW8Rf3u4HGB0xQweG2RyETjywylKZSzLWoWAijRz8WCuOtJ6wah+avllXBqZuk29HCCvhEIRg==}
 
+  event-target-shim@5.0.1:
+    resolution: {integrity: sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==}
+    engines: {node: '>=6'}
+
   eventemitter2@6.4.9:
     resolution: {integrity: sha512-JEPTiaOt9f04oa6NOkc4aH+nVp5I3wEjpHbIPqfgCdD5v5bUzy7xQqwcVO2aDQgOWhI28da57HksMrzK9HlRxg==}
 
@@ -3649,6 +3690,9 @@ packages:
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
     engines: {node: '>=10'}
+
+  js-sdsl@4.4.2:
+    resolution: {integrity: sha512-dwXFwByc/ajSV6m5bcKAPwe4yDDF6D614pxmIi5odytzxRlwqF6nwoiCek80Ixc7Cvma5awClxrzFtxCQvcM8w==}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -4231,6 +4275,9 @@ packages:
   pino-abstract-transport@0.5.0:
     resolution: {integrity: sha512-+KAgmVeqXYbTtU2FScx1XS3kNyfZ5TrXY07V96QnUSFqo2gAqlvmaxH67Lj7SWazqsMabf+58ctdTcBgnOLUOQ==}
 
+  pino-abstract-transport@1.1.0:
+    resolution: {integrity: sha512-lsleG3/2a/JIWUtf9Q5gUNErBqwIu1tUKTT3dUzaf5DySw9ra1wcqKjJjLX1VTY64Wk1eEOYsVGSaGfCK85ekA==}
+
   pino-abstract-transport@3.0.0:
     resolution: {integrity: sha512-wlfUczU+n7Hy/Ha5j9a/gZNy7We5+cXp8YL+X+PG8S0KXxw7n/JXA3c46Y0zQznIJ83URJiwy7Lh56WLokNuxg==}
 
@@ -4241,6 +4288,9 @@ packages:
   pino-std-serializers@4.0.0:
     resolution: {integrity: sha512-cK0pekc1Kjy5w9V2/n+8MkZwusa6EyyxfeQCB799CQRhRt/CqYKiWs5adeu8Shve2ZNffvfC/7J64A2PJo1W/Q==}
 
+  pino-std-serializers@6.2.2:
+    resolution: {integrity: sha512-cHjPPsE+vhj/tnhCy/wiMh3M3z3h/j15zHQX+S9GkTBgqJuTuJzYJ4gUyACLhDaJ7kk9ba9iRDmbH2tJU03OiA==}
+
   pino-std-serializers@7.1.0:
     resolution: {integrity: sha512-BndPH67/JxGExRgiX1dX0w1FvZck5Wa4aal9198SrRhZjH3GxKQUKIBnYJTdj2HDN3UQAS06HlfcSbQj2OHmaw==}
 
@@ -4250,6 +4300,10 @@ packages:
 
   pino@7.11.0:
     resolution: {integrity: sha512-dMACeu63HtRLmCG8VKdy4cShCPKaYDR4youZqoSWLxl5Gu99HUw8bw75thbPv9Nip+H+QYX8o3ZJbTdVZZ2TVg==}
+    hasBin: true
+
+  pino@8.16.1:
+    resolution: {integrity: sha512-3bKsVhBmgPjGV9pyn4fO/8RtoVDR8ssW1ev819FsRXlRNgW8gR/9Kx+gCK4UPWd4JjrRDLWpzd/pb1AyWm3MGA==}
     hasBin: true
 
   pngjs@5.0.0:
@@ -4333,8 +4387,15 @@ packages:
   process-warning@1.0.0:
     resolution: {integrity: sha512-du4wfLyj4yCZq1VupnVSZmRsPJsNuxoDQFdCFHLaYiEbFBD7QE0a+I4D7hOxrVnh78QE/YipFAj9lXHiXocV+Q==}
 
+  process-warning@2.3.2:
+    resolution: {integrity: sha512-n9wh8tvBe5sFmsqlg+XQhaQLumwpqoAUruLwjCopgTmUBjJ/fjtBsJzKleCaIGBOMXYEhp1YfKl4d7rJ5ZKJGA==}
+
   process-warning@5.1.1:
     resolution: {integrity: sha512-oCkNVj4OKnKEcocVBcDfiIugN1/cE6rgfT3nCtzeqZPA8+rIxMaQ0xXzIkGP8Gj2qUaP1UR7uhJ1VD8lUCpzCg==}
+
+  process@0.11.10:
+    resolution: {integrity: sha512-cdGef/drWFoydD1JsMzuFf8100nZl+GT+yacc2bEced5f9Rjk4z+WtFUTBu9PhOi9j/jfmBPu0mMEY4wIdAF8A==}
+    engines: {node: '>= 0.6.0'}
 
   prom-client@15.1.3:
     resolution: {integrity: sha512-6ZiOBfCywsD4k1BN9IX0uZhF+tJkV8q8llP64G5Hajs4JOeVLPCwpPVcpXy3BwYiUGgyJzsJJQeOIv7+hDSq8g==}
@@ -4413,12 +4474,20 @@ packages:
     resolution: {integrity: sha512-FS+XFBNvn3GTAWq26joslQgWNoFu08F4kl0J4CgdNKADkdSGXQyTCnKteIAJy96Br6YbpEU1LSzV5dYtjMkMDg==}
     engines: {node: '>=0.10.0'}
 
+  react@19.2.0:
+    resolution: {integrity: sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==}
+    engines: {node: '>=0.10.0'}
+
   readable-stream@2.3.8:
     resolution: {integrity: sha512-8p0AUk4XODgIewSi0l8Epjs+EVnWiK7NoDIEGU0HhE7+ZyY8D1IMY7odu5lRrFXGg71L15KG8QrPmum45RTtdA==}
 
   readable-stream@3.6.2:
     resolution: {integrity: sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==}
     engines: {node: '>= 6'}
+
+  readable-stream@4.8.0:
+    resolution: {integrity: sha512-2jhTTU3Eilp/2DMT71gbcoqC35eQHasMJH0RHkYxwlxIv3+FR6Y5xAFZIwEGLxKkjZYEFlsiMNIdwUqjK2lLHQ==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
   readdirp@5.1.1:
     resolution: {integrity: sha512-Kko+Y5XQ6fM+Ce3dq3m9YGxnacYZYl9cA1wZjaF3Vbry2L3i1qVg8+CAgNPsXRArPMUMCaOR7oa9Nqntc43JKA==}
@@ -4641,6 +4710,9 @@ packages:
   sonic-boom@2.8.0:
     resolution: {integrity: sha512-kuonw1YOYYNOve5iHdSahXPOK49GqwA+LZhI6Wz/l0rP57iKyXXIHaRagOBHAPmGwJC6od2Z9zgvZ5loSgMlVg==}
 
+  sonic-boom@3.8.1:
+    resolution: {integrity: sha512-y4Z8LCDBuum+PBP3lSV7RHrXscqksve/bi0as7mhwVnBW+/wUqKT/2Kb7um8yqcFy0duYbbPxzt89Zy2nOCaxg==}
+
   sonic-boom@4.2.1:
     resolution: {integrity: sha512-w6AxtubXa2wTXAUsZMMWERrsIRAdrK0Sc+FUytWvYAhBJLyuI4llrMIC1DtlNSdI99EI86KZum2MMq3EAZlF9Q==}
 
@@ -4801,6 +4873,9 @@ packages:
 
   thread-stream@0.15.2:
     resolution: {integrity: sha512-UkEhKIg2pD+fjkHQKyJO3yoIvAP3N6RlNFt2dUhcS1FGvCD1cQa1M/PGknCLFIyZdtJOWQjejp7bdNqmN7zwdA==}
+
+  thread-stream@2.7.0:
+    resolution: {integrity: sha512-qQiRWsU/wvNolI6tbbCKd9iKaTnCXsTwVxhhKM6nctPdujTyztjlbUkUTUymidWcMnZ5pWR0ej4a0tjsW021vw==}
 
   thread-stream@4.2.0:
     resolution: {integrity: sha512-e2zZ96wSChazBsbENf/Pcm/4swHt2cEKQ92rhUjkL9GCKiTDJIaTBenjE/m9DXi0QBmTMDkFDdOomUy20A1tDQ==}
@@ -6729,10 +6804,10 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@rescript/react@0.14.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
+  '@rescript/react@0.14.1(react-dom@19.1.0(react@19.2.0))(react@19.2.0)':
     dependencies:
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
+      react: 19.2.0
+      react-dom: 19.1.0(react@19.2.0)
 
   '@rolldown/binding-android-arm-eabi@1.2.13':
     optional: true
@@ -8367,6 +8442,10 @@ snapshots:
       typescript: 5.9.3
       zod: 4.6.5
 
+  abort-controller@3.0.0:
+    dependencies:
+      event-target-shim: 5.0.1
+
   accepts@1.3.8:
     dependencies:
       mime-types: 2.1.35
@@ -8920,7 +8999,7 @@ snapshots:
   envio-linux-x64@3.0.0-alpha.21:
     optional: true
 
-  envio@3.0.0-alpha.21(@types/react@19.3.0)(bufferutil@4.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.5):
+  envio@3.0.0-alpha.21(@types/react@19.3.0)(bufferutil@4.1.0)(react-dom@19.1.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.5):
     dependencies:
       '@clickhouse/client': 1.17.0
       '@elastic/ecs-pino-format': 1.4.0
@@ -8931,15 +9010,15 @@ snapshots:
       '@fuel-ts/hasher': 0.96.1
       '@fuel-ts/math': 0.96.1
       '@fuel-ts/utils': 0.96.1
-      '@rescript/react': 0.14.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@rescript/react': 0.14.1(react-dom@19.1.0(react@19.2.0))(react@19.2.0)
       bignumber.js: 9.3.1
       date-fns: 3.3.1
       dotenv: 16.4.5
       eventsource: 4.1.0
       express: 4.19.2
-      ink: 6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)
-      ink-big-text: 2.0.0(ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)
-      ink-spinner: 5.0.0(ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)
+      ink: 6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10)
+      ink-big-text: 2.0.0(ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
+      ink-spinner: 5.0.0(ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
       pino: 10.3.1
       pino-pretty: 13.1.3
       postgres: 3.4.8
@@ -9391,6 +9470,8 @@ snapshots:
       '@scure/bip32': 1.4.0
       '@scure/bip39': 1.3.0
 
+  event-target-shim@5.0.1: {}
+
   eventemitter2@6.4.9: {}
 
   eventemitter3@5.0.1: {}
@@ -9702,20 +9783,20 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  ink-big-text@2.0.0(ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0):
+  ink-big-text@2.0.0(ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0):
     dependencies:
       cfonts: 3.3.1
-      ink: 6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)
+      ink: 6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10)
       prop-types: 15.8.1
-      react: 19.1.0
+      react: 19.2.0
 
-  ink-spinner@5.0.0(ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0):
+  ink-spinner@5.0.0(ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0):
     dependencies:
       cli-spinners: 2.9.2
-      ink: 6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)
-      react: 19.1.0
+      ink: 6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10)
+      react: 19.2.0
 
-  ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10):
+  ink@6.8.0(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10):
     dependencies:
       '@alcalzone/ansi-tokenize': 0.2.5
       ansi-escapes: 7.3.0
@@ -9730,8 +9811,8 @@ snapshots:
       indent-string: 5.0.0
       is-in-ci: 2.0.0
       patch-console: 2.0.0
-      react: 19.1.0
-      react-reconciler: 0.33.0(react@19.1.0)
+      react: 19.2.0
+      react-reconciler: 0.33.0(react@19.2.0)
       scheduler: 0.27.0
       signal-exit: 3.0.7
       slice-ansi: 8.0.0
@@ -9945,6 +10026,8 @@ snapshots:
   jose@6.2.12: {}
 
   joycon@3.1.1: {}
+
+  js-sdsl@4.4.2: {}
 
   js-tokens@4.0.0: {}
 
@@ -10533,6 +10616,11 @@ snapshots:
       duplexify: 4.1.3
       split2: 4.2.0
 
+  pino-abstract-transport@1.1.0:
+    dependencies:
+      readable-stream: 4.8.0
+      split2: 4.2.0
+
   pino-abstract-transport@3.0.0:
     dependencies:
       split2: 4.2.0
@@ -10554,6 +10642,8 @@ snapshots:
       strip-json-comments: 5.0.3
 
   pino-std-serializers@4.0.0: {}
+
+  pino-std-serializers@6.2.2: {}
 
   pino-std-serializers@7.1.0: {}
 
@@ -10584,6 +10674,20 @@ snapshots:
       safe-stable-stringify: 2.5.0
       sonic-boom: 2.8.0
       thread-stream: 0.15.2
+
+  pino@8.16.1:
+    dependencies:
+      atomic-sleep: 1.0.0
+      fast-redact: 3.5.0
+      on-exit-leak-free: 2.1.2
+      pino-abstract-transport: 1.1.0
+      pino-std-serializers: 6.2.2
+      process-warning: 2.3.2
+      quick-format-unescaped: 4.0.4
+      real-require: 0.2.0
+      safe-stable-stringify: 2.5.0
+      sonic-boom: 3.8.1
+      thread-stream: 2.7.0
 
   pngjs@5.0.0: {}
 
@@ -10641,7 +10745,11 @@ snapshots:
 
   process-warning@1.0.0: {}
 
+  process-warning@2.3.2: {}
+
   process-warning@5.1.1: {}
+
+  process@0.11.10: {}
 
   prom-client@15.1.3:
     dependencies:
@@ -10708,16 +10816,23 @@ snapshots:
       react: 19.1.0
       scheduler: 0.26.0
 
+  react-dom@19.1.0(react@19.2.0):
+    dependencies:
+      react: 19.2.0
+      scheduler: 0.26.0
+
   react-is@16.13.1: {}
 
   react-is@17.0.2: {}
 
-  react-reconciler@0.33.0(react@19.1.0):
+  react-reconciler@0.33.0(react@19.2.0):
     dependencies:
-      react: 19.1.0
+      react: 19.2.0
       scheduler: 0.27.0
 
   react@19.1.0: {}
+
+  react@19.2.0: {}
 
   readable-stream@2.3.8:
     dependencies:
@@ -10734,6 +10849,14 @@ snapshots:
       inherits: 2.0.4
       string_decoder: 1.3.0
       util-deprecate: 1.0.2
+
+  readable-stream@4.8.0:
+    dependencies:
+      abort-controller: 3.0.0
+      buffer: 6.0.3
+      events: 3.3.0
+      process: 0.11.10
+      string_decoder: 1.3.0
 
   readdirp@5.1.1: {}
 
@@ -11058,6 +11181,10 @@ snapshots:
     dependencies:
       atomic-sleep: 1.0.0
 
+  sonic-boom@3.8.1:
+    dependencies:
+      atomic-sleep: 1.0.0
+
   sonic-boom@4.2.1:
     dependencies:
       atomic-sleep: 1.0.0
@@ -11215,6 +11342,10 @@ snapshots:
   thread-stream@0.15.2:
     dependencies:
       real-require: 0.1.0
+
+  thread-stream@2.7.0:
+    dependencies:
+      real-require: 0.2.0
 
   thread-stream@4.2.0:
     dependencies:

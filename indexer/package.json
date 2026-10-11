@@ -9,6 +9,7 @@
     "dev": "envio dev",
     "start": "envio start",
     "typecheck": "tsc --noEmit",
+    "pretest": "node scripts/gen-config.mjs && envio codegen && pnpm install --frozen-lockfile",
     "test": "vitest run --test-timeout=10000"
   },
   "dependencies": {
