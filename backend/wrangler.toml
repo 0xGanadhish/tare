@@ -28,7 +28,8 @@ queue = "tare-exits"
 [[queues.consumers]]
 queue = "tare-exits"
 max_batch_size = 10
-max_retries = 3
+# Retries also carry duplicates waiting out a live claim (130 s) and pending receipts; the consumer acks its own failures after 3 attempts.
+max_retries = 6
 dead_letter_queue = "tare-exits-dlq"
 
 [[durable_objects.bindings]]

@@ -53,6 +53,23 @@ describe('TxSender', () => {
     expect(row).toEqual({ status: 'reverted', kind: 'resolve', key_role: 'attester', network: 'testnet' });
   });
 
+  it('an accepted tx whose response was lost is not sent twice', async () => {
+    const chain = new FakeChain();
+    chain.acceptButFailWith = 'already known';
+    const r = await withSender(chain, (s) => s.send({ to: TO, data: '0x01', kind: 'post' }));
+    expect(chain.sent.map((t) => t.nonce)).toEqual([0]);
+    expect(r.status).toBe('success');
+  });
+
+  it('a receipt timeout reports pending with the hash instead of throwing', async () => {
+    const chain = new FakeChain();
+    chain.receiptTimeout = true;
+    const r = await withSender(chain, (s) => s.send({ to: TO, data: '0x01', kind: 'exit' }));
+    expect(r.status).toBe('pending');
+    expect(r.hash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(await env.DB.prepare('SELECT status FROM tx_log').first('status')).toBe('pending');
+  });
+
   it('a failed estimate does not burn a nonce', async () => {
     const chain = new FakeChain();
     await withSender(chain, async (s) => {

@@ -30,8 +30,7 @@ export function realHealthDeps(env: Env): HealthDeps {
 interface HealthRow { network: Network; vault: string; last_post_at: string | null; last_error: string | null; updated_at: string }
 
 /**
- * GET /health (plan Task 13). Red (503) when a watcher stopped ticking for 3 alarm intervals without
- * recording an error, or a key that pays gas runs low: posts or exits would stop, and that must never be silent.
+ * GET /health (plan Task 13). Red (503) when a watcher stopped ticking for 3 alarm intervals, or a key that pays gas runs low: posts or exits would stop, and that must never be silent.
  * Staleness is measured on the watcher's last tick: a vault whose stats are steady posts rarely, by design.
  */
 export async function handleHealth(env: Env, deps: HealthDeps = realHealthDeps(env)): Promise<Response> {
@@ -43,7 +42,7 @@ export async function handleHealth(env: Env, deps: HealthDeps = realHealthDeps(e
     env.DB.prepare(`SELECT COUNT(*) AS n FROM exits WHERE status IN ('sending', 'failed')`).first<number>('n'),
   ]);
   const vaults = results.map((r) => ({ network: r.network, vault: r.vault, lastPostAgeS: age(r.last_post_at), lastTickAgeS: age(r.updated_at)!, lastError: r.last_error }));
-  const stale = vaults.some((v) => v.lastError === null && v.lastTickAgeS * 1000 > 3 * ALARM_MS[v.network]);
+  const stale = vaults.some((v) => v.lastTickAgeS * 1000 > 3 * ALARM_MS[v.network]);
 
   let lowBalance = false;
   const balances: Record<string, Record<string, string | null>> = {};

@@ -1,12 +1,13 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { Address, Hex } from 'viem';
+import { keccak256, type Address, type Hex } from 'viem';
 import { NETWORKS, type Network } from '../../shared/networks';
 import { viemChainClient, type ChainClient, type Receipt } from './chain';
 import { rpcFor, secretFor, type Env, type KeyRole } from './env';
 
 export type TxKind = 'post' | 'exit' | 'resolve' | 'admin';
 export interface SendRequest { to: Address; data: Hex; kind: TxKind }
-export interface SendResult extends Receipt { hash: Hex }
+/** `pending`: broadcast, but no receipt within the wait. The tx may still land; callers keep the hash and check later. */
+export interface SendResult extends Omit<Receipt, 'status'> { hash: Hex; status: Receipt['status'] | 'pending' }
 
 /** Monad bills the gas limit, so the limit is the estimate plus a 15% margin, rounded up. */
 export const gasLimit = (estimate: bigint) => (estimate * 115n + 99n) / 100n;
@@ -30,9 +31,9 @@ export class NonceSender {
     let receipt: Receipt;
     try {
       receipt = await this.deps.chain.waitForReceipt(hash);
-    } catch (err) {
-      await this.log(nonce, hash, req.kind, 'unknown');
-      throw err;
+    } catch {
+      await this.log(nonce, hash, req.kind, 'pending');
+      return { hash, status: 'pending', blockNumber: 0n, gasUsed: 0n, logs: [] };
     }
     await this.log(nonce, hash, req.kind, receipt.status);
     return { hash, ...receipt };
@@ -50,15 +51,18 @@ export class NonceSender {
     if (!this.synced) await this.resync();
     for (let attempt = 0; ; attempt++) {
       const nonce = (await storage.get<number>('nonce')) ?? 0;
+      const raw = await chain.signTransaction({ to: req.to, data: req.data, nonce, gas });
+      const hash = keccak256(raw);
       try {
-        const raw = await chain.signTransaction({ to: req.to, data: req.data, nonce, gas });
-        const hash = await chain.sendRawTransaction(raw);
-        await storage.put('nonce', nonce + 1);
-        return { hash, nonce };
+        await chain.sendRawTransaction(raw);
       } catch (err) {
+        // The transport retries sends; if an earlier try was accepted, the error is about our own tx. Never sign it twice.
+        if (await chain.isKnown(hash)) { await storage.put('nonce', nonce + 1); return { hash, nonce }; }
         if (attempt === 0 && NONCE_ERROR.test(String(err))) { await this.resync(); continue; }
         throw err;
       }
+      await storage.put('nonce', nonce + 1);
+      return { hash, nonce };
     }
   }
 

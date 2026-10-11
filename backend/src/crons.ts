@@ -5,6 +5,7 @@ import { abis } from '../../shared/contracts';
 import { NETWORKS, UNDEPLOYED, type Network } from '../../shared/networks';
 import type { Pool, Verdict } from '../../shared/types';
 import { rpcFor, type Env } from './env';
+import { safeError } from './errors';
 import { txSender, type Sender } from './txSender';
 
 /** TareRiskOracle.resolveWindow per network (immutable constructor argument, spec §4.1). */
@@ -103,7 +104,7 @@ export async function resolveDue(env: Env, network: Network, now: number, deps: 
       console.log(JSON.stringify({ msg: 'verdict_resolved', network, verdictId: id, adverse: event.args.adverse, reasons: event.args.reasons, txHash: receipt.hash }));
     } catch (err) {
       tally.failed++;
-      console.error(JSON.stringify({ msg: 'resolve_failed', network, verdictId: id, error: String(err) }));
+      console.error(JSON.stringify({ msg: 'resolve_failed', network, verdictId: id, error: safeError(err) }));
     }
   }
   return tally;

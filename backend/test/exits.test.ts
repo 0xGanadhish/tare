@@ -24,6 +24,7 @@ function fakeDeps(over: Partial<ExitDeps> = {}) {
   const sent: SendRequest[] = [];
   const deps: ExitDeps = {
     simulate: async () => null,
+    receipt: async () => null,
     sender: () => ({
       send: async (req: SendRequest): Promise<SendResult> => {
         sent.push(req);
@@ -111,6 +112,49 @@ describe('exit consumer', () => {
     await run([{ body: job }], deps);
     expect(sent).toHaveLength(0);
     expect(await env.DB.prepare('SELECT status, error FROM exits').first()).toEqual({ status: 'skipped', error: 'VerdictAlreadyUsed' });
+  });
+
+  it('benign reverts (already out) are skipped quietly', async () => {
+    for (const reason of ['NothingToExit', 'NotEnabled']) {
+      await env.DB.exec('DELETE FROM exits; DELETE FROM events;');
+      const { deps } = fakeDeps({ simulate: async () => reason });
+      await run([{ body: job }], deps);
+      expect(await env.DB.prepare('SELECT status FROM exits').first('status')).toBe('skipped');
+      expect(await eventsOf()).toEqual([]);
+    }
+  });
+
+  it('a fresh claim held by another delivery waits past the stale-claim window', async () => {
+    await env.DB.prepare(`INSERT INTO exits (network, verdict_id, owner, status, at) VALUES ('testnet', '7', ?, 'sending', ?)`).bind(OWNER, new Date().toISOString()).run();
+    const { deps, sent } = fakeDeps();
+    const result = await run([{ body: job, attempts: 2 }], deps);
+    expect(sent).toHaveLength(0);
+    expect(result.retryMessages[0].delaySeconds).toBeGreaterThanOrEqual(120);
+  });
+
+  it('a pending send is stored as sent, and the retry confirms from its receipt without sending again', async () => {
+    let calls = 0;
+    const pendingHash = `0x${'ee'.repeat(32)}` as Hex;
+    const { deps, sent } = fakeDeps({
+      sender: () => ({ send: async (r: SendRequest) => { calls++; sent.push(r); return { hash: pendingHash, status: 'pending', blockNumber: 0n, gasUsed: 0n, logs: [] }; } }),
+      receipt: async (_n, hash) => (hash === pendingHash ? { status: 'success', blockNumber: 2n, gasUsed: 1n, logs: [exitedLog(5n, 5n, 0n)] } : null),
+    });
+    const first = await run([{ body: job, attempts: 1 }], deps);
+    expect(first.retryMessages).toHaveLength(1);
+    expect(await env.DB.prepare('SELECT status, tx_hash FROM exits').first()).toEqual({ status: 'sent', tx_hash: pendingHash });
+    await run([{ body: job, attempts: 2 }], deps);
+    expect(calls).toBe(1);
+    expect(await env.DB.prepare('SELECT status FROM exits').first('status')).toBe('confirmed');
+    expect((await eventsOf()).map((e) => e.type)).toEqual(['exit_confirmed']);
+  });
+
+  it('error text never carries the RPC URL into the Watch feed', async () => {
+    const { deps } = fakeDeps({ sender: () => ({ send: async () => { throw new Error('HTTP request failed. URL: https://monad-testnet.g.alchemy.com/v2/SECRETKEY'); } }) });
+    await run([{ body: job, attempts: 3 }], deps);
+    const [event] = await eventsOf();
+    expect(event.type).toBe('exit_failed');
+    expect(event.message).not.toContain('SECRETKEY');
+    expect(await env.DB.prepare('SELECT error FROM exits').first('error')).not.toContain('SECRETKEY');
   });
 
   it('a retry after a failed attempt sends again', async () => {

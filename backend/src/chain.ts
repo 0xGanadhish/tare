@@ -11,6 +11,8 @@ export interface ChainClient {
   getTransactionCount(): Promise<number>;
   signTransaction(tx: UnsignedTx): Promise<Hex>;
   sendRawTransaction(raw: Hex): Promise<Hex>;
+  /** Whether the node has seen this tx (pending or mined). */
+  isKnown(hash: Hex): Promise<boolean>;
   waitForReceipt(hash: Hex): Promise<Receipt>;
 }
 
@@ -29,6 +31,7 @@ export function viemChainClient(chain: Chain, rpcUrl: string, privateKey: Hex): 
       });
     },
     sendRawTransaction: (raw) => client.sendRawTransaction({ serializedTransaction: raw }),
+    isKnown: (hash) => client.getTransaction({ hash }).then(() => true, () => false),
     async waitForReceipt(hash) {
       const r = await client.waitForTransactionReceipt({ hash, timeout: 60_000 });
       return { status: r.status, blockNumber: r.blockNumber, gasUsed: r.gasUsed, logs: r.logs };

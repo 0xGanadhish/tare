@@ -40,7 +40,10 @@ const req = (path: string, body: unknown, token = 'test-admin-token') => new Req
 
 function adminDeps() {
   const sent: (SendRequest & { role: string })[] = [];
+  const jobs: unknown[] = [];
   const deps: AdminDeps = {
+    readProtections: async () => [{ owner: '0x00000000000000000000000000000000000000a1', minConfidenceBps: 9000 }],
+    enqueue: async (job) => { jobs.push(job); },
     sender: (_network, role) => ({
       send: async (r: SendRequest): Promise<SendResult> => {
         sent.push({ ...r, role });
@@ -57,7 +60,7 @@ function adminDeps() {
       },
     }),
   };
-  return { deps, sent };
+  return { deps, sent, jobs };
 }
 
 describe('admin: stats', () => {
@@ -112,6 +115,12 @@ describe('admin: drill', () => {
     expect(doc.state).toMatch(/drill/i);
     expect(stateHash(doc as never)).toBe(body.stateHash);
   });
+
+  it('drill route: queues exits for protected owners, like a real EXIT', async () => {
+    const { deps, jobs } = adminDeps();
+    await handleAdmin(req('/v1/admin/drill', { network: 'testnet', vault: MIRROR }), env, deps);
+    expect(jobs).toEqual([{ network: 'testnet', vault: MIRROR, owner: '0x00000000000000000000000000000000000000a1', verdictId: '99' }]);
+  });
 });
 
 describe('health', () => {
@@ -137,11 +146,16 @@ describe('health', () => {
     expect((await handleHealth(env, healthy)).status).toBe(503);
   });
 
-  it('health: a vault with a recorded error is reported but does not turn the check red', async () => {
-    await tick(60, 'Jev HTTP 503');
+  it('health: a vault still ticking with an error is reported but stays green', async () => {
+    await tick(2, 'Jev HTTP 503');
     const res = await handleHealth(env, healthy);
     expect(res.status).toBe(200);
     expect((await res.json<{ vaults: { lastError: string }[] }>()).vaults[0].lastError).toBe('Jev HTTP 503');
+  });
+
+  it('health: a vault that stopped ticking after an error → 503', async () => {
+    await tick(60, 'Jev HTTP 503');
+    expect((await handleHealth(env, healthy)).status).toBe(503);
   });
 
   it('health: attester below 0.05 MON → 503', async () => {

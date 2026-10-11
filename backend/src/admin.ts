@@ -7,10 +7,15 @@ import { postVerdict } from './archive';
 import type { Env, KeyRole } from './env';
 import { error, json } from './http';
 import { txSender, type Sender } from './txSender';
-import { watcherFor } from './watcher';
+import { realEnvioDeps, readProtections } from './envio';
+import { fanOut, watcherFor, type WatcherDeps } from './watcher';
 
-export interface AdminDeps { sender(network: Network, role: KeyRole): Sender }
-export const realAdminDeps = (env: Env): AdminDeps => ({ sender: (network, role) => txSender(env, network, role) });
+export interface AdminDeps extends Pick<WatcherDeps, 'readProtections' | 'enqueue'> { sender(network: Network, role: KeyRole): Sender }
+export const realAdminDeps = (env: Env): AdminDeps => ({
+  sender: (network, role) => txSender(env, network, role),
+  readProtections: (network, vault) => readProtections(env.DB, realEnvioDeps(env), network, vault.address as Address),
+  enqueue: async (job) => { await env.EXITS.send(job); },
+});
 
 /** Constant-time bearer check. With no ADMIN_TOKEN configured, every admin call is refused. */
 export async function authorized(request: Request, env: Env): Promise<boolean> {
@@ -64,6 +69,7 @@ async function drill(env: Env, body: Record<string, unknown>, deps: AdminDeps): 
     state: `Manual drill posted by the Tare operator to demonstrate a Guardian exit on ${vault.name}. This is not a Jev verdict.`,
   };
   const { id, txHash } = await postVerdict(env, network, vault.address, judgment, doc, deps.sender(network, 'attester'));
+  await fanOut(env.DB, deps, network, vault, id, judgment, txHash);
   return json({ id: id.toString(), txHash, stateHash: stateHash(doc) });
 }
 

@@ -2,6 +2,7 @@ import { createPublicClient, http, parseAbiItem, type Address } from 'viem';
 import type { Flows } from '../../lib/judge/state';
 import { NETWORKS, type Network } from '../../shared/networks';
 import { rpcFor, type Env } from './env';
+import { safeError } from './errors';
 import type { Protection } from './watcher';
 
 /** The public RPC caps getLogs at 100 blocks per call (as in worker/index.ts). */
@@ -75,7 +76,7 @@ export async function readFlows(deps: EnvioDeps, network: Network, vault: Addres
     const pct = totalAssets === 0n ? 0 : Number((net * 10_000n) / totalAssets) / 100;
     return { netOutUsd: usd(net), netOutPctTvl: pct, largestOutUsd: usd(largest) };
   } catch (err) {
-    console.error(JSON.stringify({ msg: 'envio_flows_failed', network, vault, error: String(err) }));
+    console.error(JSON.stringify({ msg: 'envio_flows_failed', network, vault, error: safeError(err) }));
     return null;
   }
 }
@@ -114,7 +115,7 @@ export async function readProtections(db: D1Database, deps: EnvioDeps, network: 
     ]);
     return data.Protection.filter((p) => p.vault.toLowerCase() === vault.toLowerCase()).map((p) => ({ owner: p.owner as Address, minConfidenceBps: p.minConfidenceBps }));
   } catch (err) {
-    console.error(JSON.stringify({ msg: 'envio_protections_failed', network, vault, error: String(err) }));
+    console.error(JSON.stringify({ msg: 'envio_protections_failed', network, vault, error: safeError(err) }));
   }
 
   const cursor = await db.prepare(`SELECT block FROM log_cursors WHERE network = ? AND name = 'guardian'`).bind(network).first<number>('block');
@@ -130,7 +131,7 @@ export async function readProtections(db: D1Database, deps: EnvioDeps, network: 
       last = to;
     }
   } catch (err) {
-    console.error(JSON.stringify({ msg: 'guardian_logs_failed', network, vault, lastBlock: last.toString(), error: String(err) }));
+    console.error(JSON.stringify({ msg: 'guardian_logs_failed', network, vault, lastBlock: last.toString(), error: safeError(err) }));
   }
   return enabledFor(db, network, vault);
 }
