@@ -1,0 +1,82 @@
+# Ids are prefixed with the chain id so testnet (10143) and mainnet (143) share one schema.
+
+enum OracleVerdict {
+  HOLD
+  EXIT
+  MOVE
+}
+
+# One TareRiskOracle post, later graded by VerdictResolved.
+type Verdict {
+  id: ID! # <chainId>-<postId>
+  chainId: Int!
+  postId: BigInt!
+  vault: String! @index
+  verdict: OracleVerdict!
+  confidenceBps: Int!
+  riskBps: Int!
+  stateHash: String!
+  postedAt: BigInt!
+  txHash: String!
+  resolved: Boolean!
+  adverse: Boolean
+  reasons: Int # bitmask: 1 share price drop, 2 TVL drop, 4 liquidity floor, 8 vault unreadable (REASON_BROKEN)
+  resolvedAt: BigInt
+  exits: [Exit!]! @derivedFrom(field: "verdict")
+}
+
+# A user's GuardianV2 rule for one vault.
+type Protection {
+  id: ID! # <chainId>-<owner>-<vault>
+  chainId: Int!
+  owner: String! @index
+  vault: String! @index
+  enabled: Boolean!
+  minConfidenceBps: Int!
+  maxAge: Int!
+  updatedAt: BigInt!
+}
+
+type Exit {
+  id: ID! # <chainId>-<txHash>-<logIndex>
+  chainId: Int!
+  owner: String! @index
+  vault: String! @index
+  verdict: Verdict!
+  caller: String!
+  shares: BigInt!
+  assets: BigInt!
+  remainingShares: BigInt!
+  txHash: String!
+  at: BigInt!
+}
+
+# ERC-4626 Deposit / Withdraw totals per vault per UTC hour.
+type VaultFlowHour {
+  id: ID! # <chainId>-<vault>-<hourTs>
+  chainId: Int!
+  vault: String! @index
+  hourTs: BigInt! @index
+  inAssets: BigInt!
+  outAssets: BigInt!
+  largestOut: BigInt!
+}
+
+# A single withdrawal of at least 1% of the vault's last-seen total assets.
+type LargeWithdrawal {
+  id: ID! # <chainId>-<txHash>-<logIndex>
+  chainId: Int!
+  vault: String! @index
+  owner: String!
+  assets: BigInt!
+  at: BigInt!
+}
+
+# Running estimate of a vault's total assets: an RPC baseline read once, plus flows since.
+type VaultState {
+  id: ID! # <chainId>-<vault>
+  chainId: Int!
+  vault: String!
+  trackedAssets: BigInt!
+  baselineFromRpc: Boolean!
+}

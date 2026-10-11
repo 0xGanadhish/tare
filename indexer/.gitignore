@@ -1,0 +1,7 @@
+node_modules/
+generated/
+build/
+.env
+*.res.js
+*.res.mjs
+lib/
