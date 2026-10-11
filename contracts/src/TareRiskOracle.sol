@@ -35,6 +35,15 @@ contract TareRiskOracle {
     }
 
     uint16 internal constant MAX_BPS = 10_000;
+    /// Share price fell more than 0.5%.
+    uint16 public constant PPS_DROP_BPS = 50;
+    /// Total assets fell more than 20%.
+    uint16 public constant TVL_DROP_BPS = 2_000;
+    /// Withdrawable liquidity below 5% of total assets.
+    uint16 public constant LIQ_FLOOR_BPS = 500;
+    uint8 public constant REASON_PPS = 1;
+    uint8 public constant REASON_TVL = 2;
+    uint8 public constant REASON_LIQ = 4;
 
     address public immutable owner;
     uint64 public immutable resolveWindow;
@@ -52,6 +61,9 @@ contract TareRiskOracle {
     error VaultNotRegistered();
     error AdapterLocked();
     error BpsOutOfRange();
+    error UnknownPost();
+    error WindowOpen();
+    error AlreadyResolved();
 
     event VerdictPosted(
         uint256 indexed id,
@@ -62,6 +74,7 @@ contract TareRiskOracle {
         bytes32 stateHash,
         uint64 postedAt
     );
+    event VerdictResolved(uint256 indexed id, bool adverse, uint8 reasons);
     event VaultRegistered(address indexed vault, address adapter);
     event AttesterChanged(address attester);
 
@@ -113,6 +126,27 @@ contract TareRiskOracle {
         });
         latest[vault] = id;
         emit VerdictPosted(id, vault, verdict, confidenceBps, riskBps, stateHash, uint64(block.timestamp));
+    }
+
+    /// @notice Grade a verdict once its window has passed, from onchain data only. Anyone can call it.
+    /// Adverse means the vault got worse for depositors: share price fell, assets fled, or liquidity dried up.
+    function resolve(uint256 id) external returns (bool adverse) {
+        if (id == 0 || id > postCount) revert UnknownPost();
+        Resolution storage r = _resolutions[id];
+        if (r.resolved) revert AlreadyResolved();
+        Post storage p = _posts[id];
+        if (block.timestamp < uint256(p.postedAt) + resolveWindow) revert WindowOpen();
+
+        (uint256 ppsNow, uint256 assetsNow, uint256 liqNow) = _metrics(p.vault);
+        uint8 reasons;
+        if (ppsNow * MAX_BPS < p.ppsAtPost * (MAX_BPS - PPS_DROP_BPS)) reasons |= REASON_PPS;
+        if (assetsNow * MAX_BPS < p.assetsAtPost * (MAX_BPS - TVL_DROP_BPS)) reasons |= REASON_TVL;
+        if (adapterOf[p.vault] != address(0) && liqNow * MAX_BPS < assetsNow * LIQ_FLOOR_BPS) reasons |= REASON_LIQ;
+
+        adverse = reasons != 0;
+        _resolutions[id] =
+            Resolution({resolved: true, adverse: adverse, reasons: reasons, resolvedAt: uint64(block.timestamp)});
+        emit VerdictResolved(id, adverse, reasons);
     }
 
     function getPost(uint256 id) external view returns (Post memory) {
