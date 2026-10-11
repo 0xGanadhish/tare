@@ -27,6 +27,10 @@ contract GuardianV2 {
 
     mapping(address vault => bool) public approvedVault;
     mapping(address owner => mapping(address vault => Rule)) public rules;
+    /// Verdict ids at or below this can't exit the owner: set to the oracle's last id on enable (so a verdict
+    /// from earlier in the same second doesn't count) and to the verdict's id after a full exit (so one verdict
+    /// can't be replayed against a re-deposit). Partial exits keep it, so they can finish on the same verdict.
+    mapping(address owner => mapping(address vault => uint256)) public verdictFloor;
 
     error NotAdmin();
     error VaultNotApproved();
@@ -38,6 +42,8 @@ contract GuardianV2 {
     error StaleVerdict();
     error VerdictPredatesEnable();
     error NothingToExit();
+    error VerdictAlreadyUsed();
+    error ZeroArg();
 
     event Enabled(address indexed owner, address indexed vault, uint16 minConfidenceBps, uint32 maxAge);
     event Disabled(address indexed owner, address indexed vault);
@@ -53,6 +59,7 @@ contract GuardianV2 {
     event VaultApproved(address indexed vault, bool ok);
 
     constructor(address admin_, TareRiskOracle oracle_) {
+        if (admin_ == address(0) || address(oracle_) == address(0)) revert ZeroArg();
         admin = admin_;
         oracle = oracle_;
     }
@@ -71,10 +78,12 @@ contract GuardianV2 {
         rules[msg.sender][vault] = Rule({
             enabled: true, minConfidenceBps: minConfidenceBps, maxAge: maxAge, enabledAt: uint64(block.timestamp)
         });
+        verdictFloor[msg.sender][vault] = oracle.postCount();
         emit Enabled(msg.sender, vault, minConfidenceBps, maxAge);
     }
 
     function disable(address vault) external {
+        if (!rules[msg.sender][vault].enabled) return;
         rules[msg.sender][vault].enabled = false;
         emit Disabled(msg.sender, vault);
     }
@@ -91,10 +100,12 @@ contract GuardianV2 {
         if (shares == 0) revert NothingToExit();
 
         assets = IERC4626(vault).redeem(shares, owner, owner);
-        emit Exited(owner, vault, id, msg.sender, shares, assets, IERC20(vault).balanceOf(owner));
+        uint256 remaining = IERC20(vault).balanceOf(owner);
+        if (remaining == 0) verdictFloor[owner][vault] = id;
+        emit Exited(owner, vault, id, msg.sender, shares, assets, remaining);
     }
 
-    /// @dev The six exit conditions (spec 4.3), in order. Returns the verdict id that authorises the exit.
+    /// @dev The six exit conditions (spec 4.3), in order, plus the verdict-floor check. Returns the verdict id that authorises the exit.
     function _checkVerdict(address vault, address owner) internal view returns (uint256 id) {
         if (!approvedVault[vault]) revert VaultNotApproved();
         Rule memory rule = rules[owner][vault];
@@ -106,5 +117,6 @@ contract GuardianV2 {
         if (p.confidenceBps < rule.minConfidenceBps) revert BelowThreshold();
         if (block.timestamp - p.postedAt > rule.maxAge) revert StaleVerdict();
         if (p.postedAt < rule.enabledAt) revert VerdictPredatesEnable();
+        if (id <= verdictFloor[owner][vault]) revert VerdictAlreadyUsed();
     }
 }

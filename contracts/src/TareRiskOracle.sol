@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ILiquidityAdapter} from "./interfaces/ILiquidityAdapter.sol";
 
 /// @title TareRiskOracle
@@ -44,6 +45,11 @@ contract TareRiskOracle {
     uint8 public constant REASON_PPS = 1;
     uint8 public constant REASON_TVL = 2;
     uint8 public constant REASON_LIQ = 4;
+    /// The vault's (or adapter's) views reverted at grading time.
+    uint8 public constant REASON_BROKEN = 8;
+    /// After a failed metrics read, at least this much gas must remain, so a caller can't starve the read
+    /// (63/64 rule) to fake a "broken" grade: leaving this much means the read itself had ~6.4M gas.
+    uint256 internal constant BROKEN_GAS_GUARD = 100_000;
 
     address public immutable owner;
     uint64 public immutable resolveWindow;
@@ -61,6 +67,8 @@ contract TareRiskOracle {
     error VaultNotRegistered();
     error AdapterLocked();
     error BpsOutOfRange();
+    error ZeroArg();
+    error InsufficientGas();
     error UnknownPost();
     error WindowOpen();
     error AlreadyResolved();
@@ -79,6 +87,7 @@ contract TareRiskOracle {
     event AttesterChanged(address attester);
 
     constructor(address owner_, address attester_, uint64 resolveWindow_) {
+        if (owner_ == address(0) || attester_ == address(0) || resolveWindow_ == 0) revert ZeroArg();
         owner = owner_;
         attester = attester_;
         resolveWindow = resolveWindow_;
@@ -111,7 +120,11 @@ contract TareRiskOracle {
         if (msg.sender != attester) revert NotAttester();
         if (!registered[vault]) revert VaultNotRegistered();
         if (confidenceBps > MAX_BPS || riskBps > MAX_BPS) revert BpsOutOfRange();
-        (uint256 pps, uint256 assets, uint256 liquidity) = _metrics(vault);
+        // A vault whose views revert still gets its verdict on record (snapshot zeros); grading marks it broken.
+        (uint256 pps, uint256 assets, uint256 liquidity) = (0, 0, 0);
+        try this.metricsOf(vault) returns (uint256 pps_, uint256 assets_, uint256 liquidity_) {
+            (pps, assets, liquidity) = (pps_, assets_, liquidity_);
+        } catch {}
         id = ++postCount;
         _posts[id] = Post({
             vault: vault,
@@ -137,11 +150,18 @@ contract TareRiskOracle {
         Post storage p = _posts[id];
         if (block.timestamp < uint256(p.postedAt) + resolveWindow) revert WindowOpen();
 
-        (uint256 ppsNow, uint256 assetsNow, uint256 liqNow) = _metrics(p.vault);
         uint8 reasons;
-        if (ppsNow * MAX_BPS < p.ppsAtPost * (MAX_BPS - PPS_DROP_BPS)) reasons |= REASON_PPS;
-        if (assetsNow * MAX_BPS < p.assetsAtPost * (MAX_BPS - TVL_DROP_BPS)) reasons |= REASON_TVL;
-        if (adapterOf[p.vault] != address(0) && liqNow * MAX_BPS < assetsNow * LIQ_FLOOR_BPS) reasons |= REASON_LIQ;
+        try this.metricsOf(p.vault) returns (uint256 ppsNow, uint256 assetsNow, uint256 liqNow) {
+            if (ppsNow * MAX_BPS < p.ppsAtPost * (MAX_BPS - PPS_DROP_BPS)) reasons |= REASON_PPS;
+            if (assetsNow * MAX_BPS < p.assetsAtPost * (MAX_BPS - TVL_DROP_BPS)) reasons |= REASON_TVL;
+            if (
+                adapterOf[p.vault] != address(0)
+                    && liqNow < Math.mulDiv(assetsNow, LIQ_FLOOR_BPS, MAX_BPS, Math.Rounding.Ceil)
+            ) reasons |= REASON_LIQ;
+        } catch {
+            if (gasleft() < BROKEN_GAS_GUARD) revert InsufficientGas();
+            reasons = REASON_BROKEN;
+        }
 
         adverse = reasons != 0;
         _resolutions[id] =
@@ -157,7 +177,9 @@ contract TareRiskOracle {
         return _resolutions[id];
     }
 
-    function _metrics(address vault) internal view returns (uint256 pps, uint256 assets, uint256 liquidity) {
+    /// @notice Current share price (assets per whole share), total assets and withdrawable liquidity
+    /// (`type(uint256).max` when the vault has no adapter). Reverts if the vault or adapter does.
+    function metricsOf(address vault) external view returns (uint256 pps, uint256 assets, uint256 liquidity) {
         IERC4626 v = IERC4626(vault);
         pps = v.convertToAssets(10 ** v.decimals());
         assets = v.totalAssets();

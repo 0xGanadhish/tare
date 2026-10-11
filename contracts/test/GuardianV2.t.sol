@@ -239,6 +239,54 @@ contract GuardianV2Test is Test {
         guardian.setVaultApproved(address(vault), false);
     }
 
+    // --- review fixes ---
+
+    function test_exit_verdictPostedEarlierInSameSecondDoesNotCount() public {
+        _deposit(user, 1_000e6);
+        _post(TareRiskOracle.Verdict.EXIT, 9500);
+        _arm(user, 9000, 600); // same block timestamp as the post
+        vm.expectRevert(GuardianV2.VerdictAlreadyUsed.selector);
+        guardian.exit(address(vault), user);
+    }
+
+    function test_exit_fullExitConsumesVerdict_reDepositIsSafe() public {
+        _ready();
+        guardian.exit(address(vault), user);
+        _deposit(user, 500e6);
+        vm.warp(block.timestamp + 10);
+        vm.expectRevert(GuardianV2.VerdictAlreadyUsed.selector);
+        guardian.exit(address(vault), user);
+        // A fresh EXIT verdict still protects the new deposit.
+        uint256 id2 = _post(TareRiskOracle.Verdict.EXIT, 9500);
+        assertEq(guardian.verdictFloor(user, address(vault)), id2 - 1);
+        assertEq(guardian.exit(address(vault), user), 500e6);
+    }
+
+    function test_exit_partialExitCanContinueOnSameVerdict() public {
+        _ready();
+        vm.prank(vaultAdmin);
+        vault.setStats(0, 9900);
+        guardian.exit(address(vault), user);
+        vm.prank(vaultAdmin);
+        vault.setStats(0, 0);
+        assertGt(guardian.exit(address(vault), user), 0);
+        assertEq(vault.balanceOf(user), 0);
+    }
+
+    function test_disable_noEventWhenNotEnabled() public {
+        vm.recordLogs();
+        vm.prank(user);
+        guardian.disable(address(vault));
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
+    function test_constructor_rejectsZeroArgs() public {
+        vm.expectRevert(GuardianV2.ZeroArg.selector);
+        new GuardianV2(address(0), oracle);
+        vm.expectRevert(GuardianV2.ZeroArg.selector);
+        new GuardianV2(admin, TareRiskOracle(address(0)));
+    }
+
     // --- invariant: assets only ever move vault -> owner ---
 
     function testFuzz_exit_onlyOwnerReceives(address who, uint96 amount, uint16 conf, uint16 minConf) public {

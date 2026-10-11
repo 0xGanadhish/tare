@@ -26,6 +26,28 @@ contract LossyVault is ERC4626 {
     }
 }
 
+/// Vault whose views can be switched to revert (e.g. a MetaMorpho market's IRM breaking).
+contract BreakableVault is LossyVault {
+    bool public broken;
+
+    constructor(IERC20 asset_) LossyVault(asset_) {}
+
+    function setBroken(bool b) external {
+        broken = b;
+    }
+
+    function totalAssets() public view override returns (uint256) {
+        require(!broken, "broken");
+        return super.totalAssets();
+    }
+}
+
+contract HugeAdapter {
+    function availableLiquidity(address) external pure returns (uint256) {
+        return type(uint256).max;
+    }
+}
+
 contract OracleResolveTest is Test {
     event VerdictResolved(uint256 indexed id, bool adverse, uint8 reasons);
 
@@ -169,5 +191,45 @@ contract OracleResolveTest is Test {
         lossy.setCash(0);
         assertTrue(_resolveAfterWindow(id));
         _assertResolution(id, true, 7);
+    }
+
+    function test_post_succeedsWhenVaultViewsRevert() public {
+        BreakableVault b = new BreakableVault(usdc);
+        vm.prank(owner);
+        oracle.registerVault(address(b), address(0));
+        b.setBroken(true);
+        uint256 id = _post(address(b));
+        TareRiskOracle.Post memory p = oracle.getPost(id);
+        assertEq(p.ppsAtPost, 0);
+        assertEq(p.assetsAtPost, 0);
+        assertEq(oracle.latest(address(b)), id);
+    }
+
+    function test_resolve_brokenVaultIsAdverse() public {
+        BreakableVault b = new BreakableVault(usdc);
+        vm.prank(owner);
+        oracle.registerVault(address(b), address(0));
+        uint256 id = _post(address(b));
+        b.setBroken(true);
+        assertTrue(_resolveAfterWindow(id));
+        _assertResolution(id, true, oracle.REASON_BROKEN());
+    }
+
+    function test_resolve_hugeAdapterDoesNotOverflow() public {
+        MirrorVault v2 = new MirrorVault(usdc, "V2", "v2", "V2", 0, 0, admin);
+        HugeAdapter huge = new HugeAdapter();
+        vm.prank(owner);
+        oracle.registerVault(address(v2), address(huge));
+        uint256 id = _post(address(v2));
+        assertFalse(_resolveAfterWindow(id));
+    }
+
+    function test_constructor_rejectsZeroArgs() public {
+        vm.expectRevert(TareRiskOracle.ZeroArg.selector);
+        new TareRiskOracle(address(0), attester, WINDOW);
+        vm.expectRevert(TareRiskOracle.ZeroArg.selector);
+        new TareRiskOracle(owner, address(0), WINDOW);
+        vm.expectRevert(TareRiskOracle.ZeroArg.selector);
+        new TareRiskOracle(owner, attester, 0);
     }
 }
