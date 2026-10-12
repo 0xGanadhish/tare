@@ -78,7 +78,7 @@ export function DepositFlow({ vault, defaultAmount }: DepositFlowProps) {
         <div role="alertdialog" aria-label="Real funds" className="mt-3 rounded-lg border border-avoid/40 bg-avoid/5 p-3 text-[12.5px] leading-snug text-ink">
           <p>
             This deposit uses real USDC on Monad Mainnet. The vault is run by {vault.protocol === 'euler' ? 'Euler' : vault.protocol === 'morpho' ? 'Morpho' : 'its protocol'}, not Tare,
-            and can lose value or lock withdrawals. Jev&rsquo;s verdicts are forecasts, not guarantees. Tare never holds your funds.
+            and can lose value or lock withdrawals. Verdicts are forecasts, not guarantees. Tare never holds your funds.
           </p>
           <Button
             size="sm"

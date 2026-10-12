@@ -1,7 +1,6 @@
 'use client';
 
 import type { AssetClass, Choice, Intent } from '@/shared/types';
-import { sure } from '@/shared/explain';
 
 const LOW = 0.6;
 
@@ -57,7 +56,7 @@ function Chip<T extends string>({
     <label className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-[12px] ${unsure ? 'border-avoid/50' : 'border-hairline'}`}>
       <span className="mono text-[10.5px] uppercase tracking-[0.06em] text-muted">{name}</span>
       {unsure && (
-        <span title={`Jev couldn't tell from your words (only ${sure(choice.confidence)}). Pick one.`} className="mono font-semibold text-avoid">
+        <span title="Not clear from your words. Pick one." className="mono font-semibold text-avoid">
           ?
         </span>
       )}

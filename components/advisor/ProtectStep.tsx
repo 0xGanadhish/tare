@@ -62,17 +62,17 @@ export function ProtectStep({ vault, onDone, initial, liveExit }: ProtectStepPro
     <div>
       <div className="mono text-[10.5px] uppercase tracking-[0.06em] text-muted">Protect with Guardian (optional)</div>
       <p className="mt-1 text-[12.5px] leading-snug text-secondary">
-        If Jev posts an EXIT verdict for this vault onchain, anyone can trigger Guardian to send your funds back to your wallet. Nothing else can move them.
+        If Tare posts an EXIT verdict for this vault onchain, anyone can trigger Guardian to send your funds back to your wallet. Nothing else can move them.
       </p>
       {liveExit && (
         <p role="note" className="mt-2 rounded-lg border border-avoid/40 bg-avoid/5 p-2.5 text-[12px] leading-snug text-ink">
-          Jev&apos;s current EXIT verdict for this vault was posted before this change, so Guardian will not act on it; it waits for a newer
+          The current EXIT verdict for this vault was posted before this change, so Guardian will not act on it; it waits for a newer
           EXIT. To leave now, use Exit now.
         </p>
       )}
       <label htmlFor={`conf-${vault}`} className="mt-3 flex justify-between text-[11.5px] text-secondary">
-        <span>Exit when Jev is at least</span>
-        <span className="mono text-ink">{pct}% sure</span>
+        <span>Exit when confidence is at least</span>
+        <span className="mono text-ink">{pct}%</span>
       </label>
       <input
         id={`conf-${vault}`}

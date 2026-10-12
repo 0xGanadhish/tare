@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ALERT_CONFIDENCE, FALLBACK_UTIL_BPS, REJUDGE_APY_BPS, REJUDGE_UTIL_BPS } from '@/lib/judge/gating';
 import { VERDICT_RULES as R } from '@/lib/judge/combine';
 import { EARLY_BELOW } from '@/shared/score';
+import { MIN_BAND_VERDICTS } from '@/components/ledger/format';
 import { MAINNET_SOFT_CAP_USD, NETWORKS, UNDEPLOYED, type Network } from '@/shared/networks';
 import { addressUrl } from '@/components/tx/explorer';
 import { A, Callout, Checklist, Code, Facts, Flow, OneLine, Section, Stamp, Steps, Strong, Table, Terms, VerdictRows, paper } from './blocks';
@@ -28,7 +29,7 @@ export const STATE_URL = 'https://ledger.tarefi.xyz/state/{stateHash}.json';
 /** The public routes GET / lists (backend `PUBLIC_ROUTES`), each with a plain description. */
 export const API_ROUTES: [string, string][] = [
   ['GET /v1/health', 'Is the backend running, and when did each watched vault last get a verdict.'],
-  ['GET /v1/pools', 'Every pool Tare tracks, with Jev’s verdict.'],
+  ['GET /v1/pools', 'Every pool Tare tracks, with its verdict.'],
   ['GET /v1/pools/{poolId}', 'One pool and its verdict.'],
   ['GET /v1/verdicts?network={testnet|mainnet}', 'The Verdict Ledger: every verdict posted onchain and how it was graded.'],
   ['GET /v1/vaults/{network}/{vault}/latest', 'The newest verdict for one vault.'],
@@ -92,7 +93,7 @@ function WhatIsTare() {
 function Explore() {
   return (
     <>
-      <OneLine>Every Monad pool with at least $100,000 in it, on one chart, each stamped with Jev&apos;s verdict.</OneLine>
+      <OneLine>Every Monad pool with at least $100,000 in it, on one chart, each stamped with its verdict.</OneLine>
       <Section id="chart" title="How to read the chart">
         <p>
           Each dot is a pool. <Strong>Further right means a higher APY. Higher up means more money in it (TVL).</Strong> The colour is Jev&apos;s verdict,
@@ -110,19 +111,22 @@ function Explore() {
         />
       </Section>
       <Section id="slip" title="The verdict slip">
-        <p>Click any dot or row to open its slip. It shows:</p>
+        <p>
+          Click any dot or row to open its slip. Under the name is the pool&apos;s label, or its size when it has none, because one protocol can run several pools
+          for the same token. The slip shows:
+        </p>
         <Terms
           items={[
             ['Real APY', 'The yield without token rewards.'],
             ['From incentives', 'How much of the APY is token rewards.'],
             ['Exit risk', 'Low, Medium or High, from Jev’s 1 to 5 risk score.'],
-            ['Jev is', 'How sure Jev is of this verdict.'],
+            ['Confidence', 'How sure Jev is of this verdict.'],
           ]}
         />
         <p>
           Underneath are Jev&apos;s reasons in plain words, for example &ldquo;Chance this APY lasts the next 30 days: 68%&rdquo;, with links to the protocol and the
-          pool&apos;s DefiLlama page. If Tare can deposit into that pool on your network, the slip has a <Strong>Deposit</Strong> button; otherwise it says{' '}
-          <Strong>Open on protocol</Strong>.
+          pool&apos;s DefiLlama page. If Tare can deposit into that pool on your network, the slip has a <Strong>Deposit</Strong> button; otherwise it notes that there is no Tare vault for it, and you can use{' '}
+          <Strong>Open on</Strong> the protocol instead.
         </p>
       </Section>
       <Callout title="Where the data comes from">
@@ -140,7 +144,7 @@ function Pulse() {
         <Terms
           items={[
             ['TVL tracked', 'All the money in the pools Tare reads.'],
-            ['Pools weighed', 'How many pools have a Jev verdict.'],
+            ['Pools weighed', 'How many pools have a verdict.'],
             ['Protocols', 'How many protocols those pools belong to.'],
             ['Median real APY', 'The typical yield once token rewards are taken out.'],
             ['TVL in emission-heavy pools', 'The share of money in pools where more than half the APY is token rewards.'],
@@ -153,7 +157,7 @@ function Pulse() {
           rows={[
             ['What the APY says, and what’s left', 'For each asset type, the advertised APY next to the real APY. A big gap means the yield leans on rewards.'],
             ['TVL by asset class', 'Where the money sits: stables, gold, RWA, MON, BTC/ETH.'],
-            ['Who holds the real yield', 'Each protocol’s money split by Jev’s verdict.'],
+            ['Who holds the real yield', 'Each protocol’s money split by verdict.'],
             ['Biggest APY swings', 'The five pools whose APY changed most over the last 7 days, up or down.'],
           ]}
         />
@@ -192,8 +196,8 @@ function Scan() {
 function Advisor() {
   return (
     <>
-      <OneLine>Type what you want, like &ldquo;500 USDC, safe, 3 months&rdquo;, and Jev returns the three pools that fit best.</OneLine>
-      <Section id="reads" title="What Jev reads from your words">
+      <OneLine>Type what you want, like &ldquo;500 USDC, safe, 3 months&rdquo;, and Tare returns the three pools that fit best.</OneLine>
+      <Section id="reads" title="What Tare reads from your words">
         <Terms
           items={[
             ['Amount', 'How much you want to put in.'],
@@ -203,7 +207,7 @@ function Advisor() {
           ]}
         />
         <p>
-          Each choice shows up as a chip you can change. If Jev is under {pct(ALERT_CONFIDENCE)} sure of one, the chip shows <Strong>?</Strong> and you pick it yourself.
+          Each choice shows up as a chip you can change. If Tare is under {pct(ALERT_CONFIDENCE)} sure of one, the chip shows <Strong>?</Strong> and you pick it yourself.
         </p>
       </Section>
       <Section id="ranks" title="How the top three are picked">
@@ -215,7 +219,7 @@ function Advisor() {
             'What is left is sorted by real APY, then by size.',
           ]}
         />
-        <p>Each pick shows a rough return over your horizon and the reasons it fits.</p>
+        <p>Each pick shows a rough return over your horizon and which of your choices it matches. <Strong>Details</Strong> opens the rest: base yield, your risk limit, any end date, and whether Tare has a vault for it.</p>
       </Section>
       <Section id="deposit" title="Depositing">
         <Steps
@@ -237,12 +241,12 @@ function Advisor() {
 function Watch() {
   return (
     <>
-      <OneLine>Your positions, Jev&apos;s latest verdict on each, and a live feed of everything that happened to them.</OneLine>
+      <OneLine>Your positions, the latest verdict on each, and a live feed of everything that happened to them.</OneLine>
       <Section id="card" title="Your position card">
         <p>Connect your wallet and each vault you are in gets a card:</p>
         <Terms
           items={[
-            ['Jev says', <>The latest onchain verdict: <Stamp label="HOLD" />, <Stamp label="EXIT" /> or <Stamp label="MOVE" />.</>],
+            ['Latest verdict', <>The latest onchain verdict: <Stamp label="HOLD" />, <Stamp label="EXIT" /> or <Stamp label="MOVE" />.</>],
             ['Confidence', 'How sure Jev was.'],
             ['Exit rule', 'Your Guardian rule, for example “≥90% · 10m”.'],
             ['What Jev saw', 'A link to the exact text Jev was given for that verdict, plus the transaction.'],
@@ -255,7 +259,7 @@ function Watch() {
           Tare is down. If part of the vault&apos;s money is lent out, it takes what can leave now and you exit the rest later.
         </p>
       </Section>
-      <Section id="when" title="When Jev looks again">
+      <Section id="when" title="When Tare checks again">
         <p>Each vault is checked every {CHECK_EVERY.testnet} on testnet and every {CHECK_EVERY.mainnet} on mainnet. Jev is asked again when:</p>
         <Checklist
           mark="→"
@@ -276,13 +280,13 @@ function Watch() {
           head={['You see', 'It means']}
           rows={[
             ['Vault stats changed', 'The vault’s numbers moved.'],
-            ['Jev judged', 'Jev looked at your position again.'],
+            ['Re-checked', 'Jev looked at your position again and gave a verdict.'],
             ['Verdict posted onchain', 'The verdict is now on the Verdict Ledger.'],
             ['Alert', 'Jev leans towards EXIT, but not as sure as your rule. Your call.'],
             ['Exit sent / You’re out', 'Guardian’s exit was sent, then confirmed, with the transaction link.'],
             ['Partly out', 'Some money is still locked in the vault; the amount is shown.'],
             ['Exit failed', 'The exit did not run, with the reason in plain words.'],
-            ['Jev unavailable', <>Jev could not be reached, so there is no new verdict and no automatic exit. You still get an alert if utilization passes {FALLBACK_UTIL_BPS / 100}%.</>],
+            ['Judge unreachable', <>Jev could not be reached, so there is no new verdict and no automatic exit. You still get an alert if utilization passes {FALLBACK_UTIL_BPS / 100}%.</>],
           ]}
         />
       </Section>
@@ -294,11 +298,11 @@ function Guardian() {
   const g = GUARDIAN;
   return (
     <>
-      <OneLine>You set an exit rule. When Jev posts a fresh EXIT that meets it, anyone can trigger the exit, and the money can only go back to you.</OneLine>
+      <OneLine>You set an exit rule. When Tare posts a fresh EXIT verdict that meets it, anyone can trigger the exit, and the money can only go back to you.</OneLine>
       <Section id="rule" title="Your rule, in two numbers">
         <Facts
           items={[
-            { k: 'How sure Jev must be', v: `${g.minPct}–${g.maxPct}%`, hint: `Default ${g.defaultPct}%.` },
+            { k: 'Confidence needed', v: `${g.minPct}–${g.maxPct}%`, hint: `Default ${g.defaultPct}%.` },
             { k: 'How fresh the verdict', v: `${g.freshness[0]}–${g.freshness[g.freshness.length - 1]} min`, hint: `Pick ${g.freshness.join(', ')} minutes. Default ${g.defaultFreshness}.` },
             { k: 'Where funds go', v: 'Your wallet', hint: 'Nowhere else, ever.', tone: 'deposit' },
           ]}
@@ -324,7 +328,7 @@ function Guardian() {
             'Guardian covers this vault.',
             'Your rule is turned on.',
             <>The vault&apos;s latest onchain verdict is <Stamp label="EXIT" />.</>,
-            'Jev is at least as sure as your rule asks.',
+            'The verdict’s confidence meets your rule.',
             'The verdict is newer than your freshness limit.',
             'The verdict was posted after you turned Guardian on.',
             'That verdict hasn’t already been used to take you fully out.',
@@ -348,7 +352,7 @@ function Guardian() {
         <Terms
           items={[
             ['The vault is short of cash', 'Guardian takes what can leave now. You are “Partly out”, and the rest can still exit later on the same verdict.'],
-            ['Jev is down', 'No new verdict means no automatic exit. When something breaks, exits get harder, never easier. Exit now still works.'],
+            ['The judge is down', 'No new verdict means no automatic exit. When something breaks, exits get harder, never easier. Exit now still works.'],
             ['You change your rule', 'An EXIT posted before the change no longer counts. Guardian waits for a newer one.'],
           ]}
         />
@@ -360,7 +364,7 @@ function Guardian() {
 function Ledger() {
   return (
     <>
-      <OneLine>Every verdict Jev makes is posted onchain with proof of what it saw, then graded in public, so Jev&apos;s track record can&apos;t be edited or flattered.</OneLine>
+      <OneLine>Every verdict is posted onchain with proof of what Jev saw, then graded in public, so the track record can&apos;t be edited or flattered.</OneLine>
       <Section id="posted" title="What gets posted">
         <p>Each verdict goes to a contract called TareRiskOracle, with:</p>
         <Terms
@@ -394,9 +398,10 @@ function Ledger() {
       <Section id="score" title="The scoreboard">
         <Terms
           items={[
-            ['Hit', 'An EXIT followed by an adverse outcome, or a HOLD or MOVE followed by a clear one.'],
-            ['Hit rate by confidence', 'Hits grouped by how sure Jev was (under 80%, 80–89%, 90–94%, 95–100%). A well-calibrated judge hits more often when it is more sure.'],
-            ['Brier score', 'How close Jev’s risk forecasts were to what happened. 0 is perfect; 0.25 is no better than a coin flip.'],
+            ['Right', 'An EXIT followed by an adverse outcome, or a HOLD or MOVE followed by a clear one. The scoreboard leads with how many graded verdicts were right.'],
+            ['Right, by confidence', `The same count grouped by how sure Jev was (under 80%, 80–89%, 90–94%, 95–100%). A well-calibrated judge is right more often when it is more sure. Groups with fewer than ${MIN_BAND_VERDICTS} verdicts are greyed out as too few to judge.`],
+            ['Brier score', 'Under “How we score this”. How close the risk forecasts were to what happened: 0 means every forecast matched, and lower is better.'],
+            ['Demo stress tests', 'On testnet, the record includes stress tests where a vault is pushed into trouble and then reset before grading. The real track record is on mainnet.'],
             ['Early data', `Shown until ${EARLY_BELOW} verdicts are graded. Small samples can mislead.`],
           ]}
         />

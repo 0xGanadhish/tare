@@ -4,14 +4,15 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { VerdictSlip } from '@/components/slip/VerdictSlip';
 import { Button } from '@/components/ui/Button';
-import { formatPct } from '@/components/field/format';
 import type { Intent, Recommendation } from '@/shared/types';
 import { SlipAction } from '@/components/slip/SlipAction';
+import { useNetwork } from '@/components/network/NetworkProvider';
 import { IntentChips, needsPick } from './IntentChips';
+import { fitSummary } from './fit';
 
 const EXAMPLE = '500 USDC, safe, 3 months';
 
-/** Manual-picker intent used when Jev cannot parse (spec §11: chips become manual pickers). */
+/** Manual-picker intent used when the intent cannot be parsed (spec §11: chips become manual pickers). */
 const blankIntent = (text: string): Intent => ({
   text,
   amount: null,
@@ -38,6 +39,7 @@ export function AdvisorClient() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
+  const { network } = useNetwork();
 
   const advise = useCallback(async (i: Intent) => {
     const mine = ++seq.current;
@@ -67,7 +69,7 @@ export function AdvisorClient() {
         parsed = await post<Intent>('/api/intent', { text: q });
       } catch {
         parsed = blankIntent(q);
-        setNotice('Jev could not read that, so pick the options yourself.');
+        setNotice('Tare could not read that, so pick the options yourself.');
       }
       if (mine !== seq.current) return;
       setIntent(parsed);
@@ -96,7 +98,7 @@ export function AdvisorClient() {
   return (
     <div>
       <h1 className="display text-[30px] sm:text-[38px]">Advisor</h1>
-      <p className="mt-1 text-[14px] text-secondary">Say what you want in plain words. Jev reads it, then ranks pools it trusts.</p>
+      <p className="mt-1 text-[14px] text-secondary">Say what you want in plain words. Tare reads it, then ranks the pools that fit.</p>
 
       <form
         onSubmit={(e) => {
@@ -142,22 +144,40 @@ export function AdvisorClient() {
         <section className="mt-8">
           <h2 className="mono mb-3 text-[10.5px] uppercase tracking-[0.06em] text-muted">Top {recs.length} for you</h2>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {recs.map((r) => (
-              <VerdictSlip
-                key={r.pool.id}
-                pool={r.pool}
-                verdict={r.verdict}
-                action={
-                  <div>
-                    <p className="mb-3 text-[12.5px] text-secondary">
-                      {r.expectedReturnUsd > 0 && <>≈ ${Math.round(r.expectedReturnUsd).toLocaleString('en-US')} over your horizon at {formatPct(r.realApy, 2)} real APY. </>}
-                      {r.fitReasons.join(' · ')}
-                    </p>
-                    <SlipAction pool={r.pool} defaultAmount={intent?.amount} />
-                  </div>
-                }
-              />
-            ))}
+            {recs.map((r) => {
+              const fit = intent ? fitSummary(r, intent, network) : null;
+              return (
+                <VerdictSlip
+                  key={r.pool.id}
+                  pool={r.pool}
+                  verdict={r.verdict}
+                  action={
+                    <div>
+                      {fit && (
+                        <div className="mb-3">
+                          <p className="text-[13px] text-ink">{fit.line}</p>
+                          <details className="group mt-1.5">
+                            <summary className="mono inline-block cursor-pointer select-none list-none text-[11px] uppercase tracking-[0.06em] text-secondary hover:text-ink [&::-webkit-details-marker]:hidden">
+                              <span className="group-open:hidden">Details ▾</span>
+                              <span className="hidden group-open:inline">Hide details ▴</span>
+                            </summary>
+                            <ul className="mt-2 space-y-1 text-[12px] leading-snug text-secondary">
+                              {fit.details.map((d) => (
+                                <li key={d} className="flex gap-2">
+                                  <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink/30" />
+                                  <span>{d}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        </div>
+                      )}
+                      <SlipAction pool={r.pool} defaultAmount={intent?.amount} note={false} />
+                    </div>
+                  }
+                />
+              );
+            })}
           </div>
         </section>
       )}

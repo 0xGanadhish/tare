@@ -23,3 +23,16 @@ test('switching network remounts the deposit flow so no step state carries over'
   rerender(<SlipAction pool={pool} />);
   expect(net.mounts).toBe(2);
 });
+
+test('a pool with no vault gets a quiet note and no second "Open on protocol" link', async () => {
+  vi.resetModules();
+  vi.doMock('./slipActionKind', () => ({ slipAction: () => ({ kind: 'open' }) }));
+  const { SlipAction: Open } = await import('./SlipAction');
+  net.network = 'testnet';
+  const pool = { id: 'p2', project: 'euler-v2' } as Pool;
+  const { container, rerender } = render(<Open pool={pool} />);
+  expect(container.querySelector('a')).toBeNull();
+  expect(container.textContent).toMatch(/No Tare vault for this pool on testnet/);
+  rerender(<Open pool={pool} note={false} />);
+  expect(container.textContent).toBe('');
+});

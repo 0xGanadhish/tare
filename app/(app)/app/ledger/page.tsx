@@ -54,7 +54,7 @@ export default function LedgerPage() {
     <div>
       <h1 className="display text-[30px] sm:text-[38px]">Ledger</h1>
       <p className="mt-1 max-w-[680px] text-[14px] text-secondary">
-        Every verdict Jev posts onchain, and how it turned out. The oracle grades each one itself after a fixed window, so this record
+        Every verdict Tare posts onchain, and how it turned out. The oracle grades each one itself after a fixed window, so this record
         cannot be edited after the fact.
       </p>
       {sample && (
@@ -86,7 +86,7 @@ export default function LedgerPage() {
       </div>
 
       <div className="mt-6">
-        {score.data ? <Scoreboard score={score.data.score} /> : score.isError ? null : <p className="text-[13px] text-muted">Loading the scoreboard…</p>}
+        {score.data ? <Scoreboard score={score.data.score} network={network} /> : score.isError ? null : <p className="text-[13px] text-muted">Loading the scoreboard…</p>}
       </div>
 
       <section aria-label="Verdicts" className="mt-6">
@@ -117,7 +117,7 @@ function Method() {
     <section aria-labelledby="method" className="mt-10 max-w-[720px] text-[13px] leading-relaxed text-secondary">
       <h2 id="method" className="text-[17px] font-semibold text-ink">Method</h2>
       <p className="mt-2">
-        When Jev posts a verdict, the oracle records the vault&apos;s share price, total assets and available liquidity. After the window
+        When Tare posts a verdict, the oracle records the vault&apos;s share price, total assets and available liquidity. After the window
         (1 hour on testnet, 24 hours on mainnet) the verdict is graded <strong className="text-ink">adverse</strong> if any of these happened:
       </p>
       <ul className="mt-2 list-disc space-y-1 pl-5">
@@ -131,8 +131,8 @@ function Method() {
         window ends, so grading does not depend on Tare.
       </p>
       <p className="mt-2">
-        A hit is an EXIT followed by an adverse outcome, or a HOLD or MOVE followed by none. The Brier score compares Jev&apos;s withdrawal-risk
-        forecast with what happened (0 is perfect). Drills, posted by hand to test exits, are labelled and left out of the score. Fewer than 30
+        A verdict is right when an EXIT is followed by an adverse outcome, or a HOLD or MOVE by none. The Brier score compares each verdict&apos;s
+        withdrawal-risk forecast with what happened (0 is perfect, lower is better). Drills, posted by hand to test exits, are labelled and left out of the score. Fewer than 30
         graded verdicts is early data.
       </p>
       <p className="mt-2">

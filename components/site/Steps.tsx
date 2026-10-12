@@ -2,7 +2,7 @@ const STEPS = [
   {
     n: '01',
     title: 'Judge',
-    body: 'Jev reads every pool: where the yield comes from, whether it will last, how risky the venue is. Emission-inflated APYs get called out before you deposit.',
+    body: 'Jev, the judge inside Tare, reads every pool: where the yield comes from, whether it will last, how risky the venue is. Emission-inflated APYs get called out before you deposit.',
   },
   {
     n: '02',
@@ -12,7 +12,7 @@ const STEPS = [
   {
     n: '03',
     title: 'Watch',
-    body: 'Turn on Guardian. If a vault tightens, Jev re-checks the position and Guardian can pull you out to your own wallet, before the vault locks.',
+    body: 'Turn on Guardian. If a vault tightens, Tare re-checks the position and Guardian can pull you out to your own wallet, before the vault locks.',
   },
 ];
 

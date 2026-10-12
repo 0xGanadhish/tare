@@ -68,12 +68,12 @@ function Launch({ factory }: { factory: Address }) {
             <label className="block text-sm">Reserve vault
               <Select value={reserve ?? ''} onChange={(event) => setSelection(event.target.value as Address)} disabled={!mirrors.length} wrapperClassName="mt-2 block w-full min-w-0" className="block min-w-0 rounded-lg border border-hairline bg-paper py-3 pl-3 text-sm outline-none focus:border-deposit">
                 {!mirrors.length && <option value="">Reserve vaults deploying</option>}
-                {mirrors.map((mirror) => <option key={mirror.address} value={mirror.address}>{mirror.mirrorOf}{mirror.address === recommended?.address ? ' · Jev recommends' : ''}</option>)}
+                {mirrors.map((mirror) => <option key={mirror.address} value={mirror.address}>{mirror.mirrorOf}{mirror.address === recommended?.address ? ' · recommended' : ''}</option>)}
               </Select>
             </label>
             <p className="text-xs leading-relaxed text-secondary">Testnet mirror · {mirrors.find((mirror) => mirror.address === reserve)?.mirrorOf ?? 'No reserve available'}. Yield is simulated; wallet transactions are real.</p>
-            {pools.isError && <p className="text-xs text-secondary">Jev recommendations are unavailable. Choose a reserve manually.</p>}
-            {!pools.isPending && !pools.isError && !recommended && <p className="text-xs text-secondary">No Jev deposit recommendation for these reserves yet.</p>}
+            {pools.isError && <p className="text-xs text-secondary">Recommendations are unavailable. Choose a reserve yourself.</p>}
+            {!pools.isPending && !pools.isError && !recommended && <p className="text-xs text-secondary">No DEPOSIT verdict for these reserves yet.</p>}
             <TxButton label="Create token" chainId={10143} disabled={!valid} run={() => {
               if (!reserve || !valid) throw new Error('Enter a name, symbol, and reserve vault');
               return writeContractAsync({ address: factory, abi: abis.launchFactory, functionName: 'create', args: [name.trim(), symbol.trim(), reserve], chainId: 10143 });

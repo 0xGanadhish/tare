@@ -5,7 +5,7 @@ import type { PulseStats } from './aggregate';
 export function KpiTiles({ stats }: { stats: PulseStats }) {
   const tiles = [
     { label: 'TVL tracked', value: formatTvl(stats.tvlTracked), hint: `across ${stats.poolCount} pools`, href: '/app/explore' },
-    { label: 'Pools weighed', value: String(stats.poolCount), hint: 'each with a Jev verdict', href: '/app/explore' },
+    { label: 'Pools weighed', value: String(stats.poolCount), hint: 'each with a verdict', href: '/app/explore' },
     { label: 'Protocols', value: String(stats.protocolCount), hint: 'live on Monad', href: '/app/explore' },
     { label: 'Median real APY', value: formatPct(stats.medianRealApy), hint: 'after stripping emissions', href: '/app/explore' },
     {

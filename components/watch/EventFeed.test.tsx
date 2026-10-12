@@ -55,7 +55,7 @@ describe('backend wording', () => {
   });
   test('jev_unavailable gets a plain title', () => {
     render(<EventFeed network="testnet" connected events={[{ ...base, type: 'jev_unavailable', txHash: null, message: 'Jev did not answer' }]} positions={[]} />);
-    expect(screen.getByText('Jev unavailable')).toBeTruthy();
+    expect(screen.getByText('Judge unreachable')).toBeTruthy();
   });
 });
 

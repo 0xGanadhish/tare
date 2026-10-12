@@ -20,8 +20,8 @@ const TONE: Record<string, string> = {
 };
 const TITLE: Record<string, string> = {
   stats_changed: 'Vault stats changed',
-  judged: 'Jev judged',
-  jev_unavailable: 'Jev unavailable',
+  judged: 'Re-checked',
+  jev_unavailable: 'Judge unreachable',
   posted: 'Verdict posted onchain',
   alert: 'Alert',
   exit_sent: 'Exit sent',

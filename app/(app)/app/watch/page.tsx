@@ -41,7 +41,7 @@ export default function WatchPage() {
     <div>
       <h1 className="display text-[30px] sm:text-[38px]">Watch</h1>
       <p className="mt-1 text-[14px] text-secondary">
-        Your positions on Monad {network === 'mainnet' ? 'Mainnet' : 'Testnet'}, Jev&apos;s latest onchain verdict, and the Guardian rule that exits for you.{' '}
+        Your positions on Monad {network === 'mainnet' ? 'Mainnet' : 'Testnet'}, the latest onchain verdict on each, and the Guardian rule that exits for you.{' '}
         <Link href="/app/ledger" className="text-ink underline decoration-hairline underline-offset-4">See every verdict</Link>
       </p>
 

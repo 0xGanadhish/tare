@@ -13,7 +13,7 @@ export function LaunchTeaser() {
             A token whose reserve <span className="text-soft">earns while it waits.</span>
           </h2>
           <p className="mt-3 max-w-[460px] text-[14px] leading-relaxed text-secondary">
-            Launch a token on a curve backed by a vault Jev watches. The yield stays in the reserve, so the floor price only
+            Launch a token on a curve backed by a vault Tare watches. The yield stays in the reserve, so the floor price only
             rises, and the same Guardian protects it.
           </p>
         </div>

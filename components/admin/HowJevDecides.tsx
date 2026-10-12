@@ -49,7 +49,7 @@ export function HowJevDecides() {
           </dl>
         </div>
         <div>
-          <h2 className="text-[18px] font-semibold tracking-[-0.02em]">How Jev rates pools on Explore</h2>
+          <h2 className="text-[18px] font-semibold tracking-[-0.02em]">How Tare rates pools on Explore</h2>
           <ul className="mt-4 space-y-2 text-[13.5px] leading-relaxed text-secondary">
             <li><b className="font-medium text-avoid">AVOID</b>: risk {R.avoidRiskAtLeast} or more out of 5, or the yield is paid in token rewards with under {pct(R.avoidRewardsLastsBelow)} chance of lasting 30 days.</li>
             <li><b className="font-medium text-deposit">DEPOSIT</b>: risk {R.depositRiskAtMost} or less, yield from real activity rather than token rewards, and at least {pct(R.depositLastsAtLeast)} chance it lasts 30 days.</li>

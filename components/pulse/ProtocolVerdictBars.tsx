@@ -27,7 +27,7 @@ export function ProtocolVerdictBars({ rows }: { rows: PulseStats['byProtocol'] }
     <Section
       eyebrow="Verdicts by protocol"
       title="Who holds the real yield"
-      note={`TVL split by Jev's verdict for the ${top.length} largest protocols.`}
+      note={`TVL split by verdict for the ${top.length} largest protocols.`}
       legend={used.map((s) => <Key key={s.key} color={s.color} label={s.label} />)}
     >
       <ul className="space-y-1">

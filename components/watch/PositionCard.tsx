@@ -66,7 +66,7 @@ export function PositionCard({ position, network }: { position: PositionV2; netw
         {fmtUsdc(position.assets)} <span className="text-[13px] text-muted">USDC</span>
       </p>
       <dl className="mt-4 grid grid-cols-3 gap-2 border-t-[1.5px] border-dashed border-[#e2dfea] pt-4 text-[12px]">
-        <Stat k="Jev says" v={latest ? latest.verdict : '–'} cls={latest ? VERDICT_TONE[latest.verdict] : ''} />
+        <Stat k="Latest verdict" v={latest ? latest.verdict : '–'} cls={latest ? VERDICT_TONE[latest.verdict] : ''} />
         <Stat k="Confidence" v={latest ? `${(latest.confidenceBps / 100).toFixed(0)}%` : '–'} />
         <Stat k="Exit rule" v={on && rule ? `≥${(rule.minConfidenceBps / 100).toFixed(0)}% · ${Math.round(rule.maxAge / 60)}m` : '–'} />
       </dl>
