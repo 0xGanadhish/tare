@@ -4,7 +4,7 @@ import { JevUnavailable } from '../../lib/jev';
 import type { DetailedPositionJudgment } from '../../lib/judge';
 import { NETWORKS } from '../../shared/networks';
 import type { ExitJob } from '../src/env';
-import { VaultWatcher, type VaultReading, type WatcherDeps } from '../src/watcher';
+import { HEARTBEAT_MS, VaultWatcher, watchOnce, type VaultReading, type WatcherDeps } from '../src/watcher';
 
 const MIRROR = NETWORKS.testnet.vaults[0].address;
 const OWNER_A = '0x00000000000000000000000000000000000000a1' as const;
@@ -131,5 +131,66 @@ describe('VaultWatcher', () => {
     const health = await env.DB.prepare('SELECT last_error FROM vault_health').first<{ last_error: string }>();
     expect(health?.last_error).toContain('rpc down');
     expect(await alarmOf(stub)).not.toBeNull();
+  });
+
+  describe('heartbeat throttle', () => {
+    const VAULT = NETWORKS.testnet.vaults[0];
+    /** Wraps D1 so the test sees how many rows each statement actually wrote. */
+    function countingDb(db: D1Database) {
+      let written = 0;
+      const wrap = (stmt: D1PreparedStatement): D1PreparedStatement => new Proxy(stmt, {
+        get(target, prop) {
+          if (prop === 'bind') return (...args: unknown[]) => wrap(target.bind(...args));
+          if (prop === 'run') return async () => { const res = await target.run(); written += res.meta.rows_written ?? 0; return res; };
+          const value = Reflect.get(target, prop);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+      const proxy = new Proxy(db, {
+        get(target, prop) {
+          if (prop === 'prepare') return (query: string) => wrap(target.prepare(query));
+          const value = Reflect.get(target, prop);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+      return { db: proxy, written: () => written };
+    }
+    const seed = (secondsAgo: number, error: string | null = null) => env.DB.batch([
+      env.DB.prepare(`INSERT OR IGNORE INTO posts (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at) VALUES ('testnet', 7, ?, 1, 9200, 4000, '0x', 1)`).bind(VAULT.address.toLowerCase()),
+      env.DB.prepare(`INSERT INTO vault_health (network, vault, last_post_at, last_error, updated_at) VALUES ('testnet', ?, '2026-10-11T00:00:00.000Z', ?, ?)`)
+        .bind(VAULT.address.toLowerCase(), error, new Date(Date.now() - secondsAgo * 1000).toISOString()),
+    ]);
+    const updatedAt = () => env.DB.prepare('SELECT updated_at FROM vault_health').first<string>('updated_at');
+    /** A steady tick: stats unchanged since the last post, so the watcher skips Jev. */
+    const steadyTick = async (db: D1Database) => { const { deps } = fakeDeps(); await watchOnce(db, VAULT, 'testnet', reading(5000).stats, deps); };
+
+    it('watcher: a steady tick inside the heartbeat window writes no D1 rows', async () => {
+      await seed(10);
+      const before = await updatedAt();
+      const counting = countingDb(env.DB);
+      await steadyTick(counting.db);
+      expect(counting.written()).toBe(0);
+      expect(await updatedAt()).toBe(before);
+    });
+
+    it('watcher: a steady tick after the heartbeat window refreshes updated_at', async () => {
+      await seed(HEARTBEAT_MS.testnet / 1000 + 1);
+      const before = await updatedAt();
+      await steadyTick(env.DB);
+      expect(Date.parse((await updatedAt())!)).toBeGreaterThan(Date.parse(before!));
+    });
+
+    it('watcher: a steady tick clears a previous error right away', async () => {
+      await seed(10, 'rpc down');
+      await steadyTick(env.DB);
+      expect(await env.DB.prepare('SELECT last_error FROM vault_health').first('last_error')).toBeNull();
+    });
+
+    it('watcher: a new error is written inside the heartbeat window', async () => {
+      await seed(10);
+      const { deps } = fakeDeps({ readVault: async () => { throw new Error('rpc down'); } });
+      await watchOnce(env.DB, VAULT, 'testnet', reading(5000).stats, deps);
+      expect(await env.DB.prepare('SELECT last_error FROM vault_health').first('last_error')).toContain('rpc down');
+    });
   });
 });

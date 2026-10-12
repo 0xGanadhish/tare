@@ -142,8 +142,13 @@ describe('health', () => {
   });
 
   it('health: stale vault → 503', async () => {
-    await tick(16); // 3 × 5 s testnet alarm = 15 s
+    await tick(91); // 3 × 30 s heartbeat = 90 s
     expect((await handleHealth(env, healthy)).status).toBe(503);
+  });
+
+  it('health: a vault between heartbeats stays green', async () => {
+    await tick(45); // watchers tick every 5 s on testnet but write the heartbeat every 30 s
+    expect((await handleHealth(env, healthy)).status).toBe(200);
   });
 
   it('health: a vault still ticking with an error is reported but stays green', async () => {
@@ -154,7 +159,7 @@ describe('health', () => {
   });
 
   it('health: a vault that stopped ticking after an error → 503', async () => {
-    await tick(60, 'Jev HTTP 503');
+    await tick(120, 'Jev HTTP 503');
     expect((await handleHealth(env, healthy)).status).toBe(503);
   });
 

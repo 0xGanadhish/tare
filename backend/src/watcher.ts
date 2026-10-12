@@ -16,6 +16,11 @@ import { addEvent } from './events';
 import { readVault } from './vaultReader';
 
 export const ALARM_MS: Record<Network, number> = { testnet: 5_000, mainnet: 30_000 };
+/**
+ * How often a steady watcher refreshes its vault_health row. Posts and error changes are written at once; the plain
+ * "still alive" write waits this long, because a 5 s heartbeat for every testnet vault alone overruns D1 Free's 100k rows/day.
+ */
+export const HEARTBEAT_MS: Record<Network, number> = { testnet: 30_000, mainnet: 30_000 };
 
 export interface VaultReading { stats: VaultStats & { liquidityPct: number | null }; totalAssets: bigint; pps: bigint }
 export interface Protection { owner: Address; minConfidenceBps: number }
@@ -69,9 +74,11 @@ const JEV_DOWN = 'jev: ';
 export async function watchOnce(db: D1Database, vault: VaultConfig, network: Network, last: VaultStats | null, deps: WatcherDeps): Promise<VaultStats | null> {
   const address = vault.address as Address;
   const now = () => new Date().toISOString();
+  // The upsert is a no-op (0 rows written) unless there is a new post, last_error changed, or the heartbeat is due.
   const health = (lastPostAt: string | null, error: string | null) => db.prepare(`INSERT INTO vault_health (network, vault, last_post_at, last_error, updated_at)
-      VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (network, vault) DO UPDATE SET last_post_at = COALESCE(?3, last_post_at), last_error = ?4, updated_at = ?5`)
-    .bind(network, address.toLowerCase(), lastPostAt, error, now()).run();
+      VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (network, vault) DO UPDATE SET last_post_at = COALESCE(?3, last_post_at), last_error = ?4, updated_at = ?5
+      WHERE ?3 IS NOT NULL OR vault_health.last_error IS NOT ?4 OR vault_health.updated_at <= ?6`)
+    .bind(network, address.toLowerCase(), lastPostAt, error, now(), new Date(Date.now() - HEARTBEAT_MS[network]).toISOString()).run();
   const fail = (stage: string, err: unknown, prefix = '') => {
     const message = `${prefix}${safeError(err)}`;
     console.error(JSON.stringify({ msg: 'watch_failed', stage, network, vault: address, error: message }));
