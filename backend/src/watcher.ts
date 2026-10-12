@@ -4,7 +4,7 @@ import { FALLBACK_UTIL_BPS } from '../../lib/judge/gating';
 import { JevUnavailable } from '../../lib/jev';
 import { judgePositionDetailed, type DetailedPositionJudgment } from '../../lib/judge';
 import type { Flows, PositionInput } from '../../lib/judge/state';
-import { NETWORKS, type Network, type VaultConfig } from '../../shared/networks';
+import { NETWORKS, UNDEPLOYED, type Network, type VaultConfig } from '../../shared/networks';
 import type { PositionJudgment, VaultStats } from '../../shared/types';
 import { toOraclePost, type StateDocument } from '../../shared/verdict';
 import { postVerdict } from './archive';
@@ -15,7 +15,8 @@ import { safeError } from './errors';
 import { addEvent } from './events';
 import { readVault } from './vaultReader';
 
-export const ALARM_MS: Record<Network, number> = { testnet: 5_000, mainnet: 30_000 };
+/** Workers Free allows 100k Durable Object requests a day; 4 testnet vaults at 5 s used ~69k of that on alarms alone. */
+export const ALARM_MS: Record<Network, number> = { testnet: 15_000, mainnet: 30_000 };
 /**
  * How often a steady watcher refreshes its vault_health row. Posts and error changes are written at once; the plain
  * "still alive" write waits this long, because a 5 s heartbeat for every testnet vault alone overruns D1 Free's 100k rows/day.
@@ -135,12 +136,19 @@ export async function watchOnce(db: D1Database, vault: VaultConfig, network: Net
   return reading.stats;
 }
 
+/** The vault's config if it should be watched: still listed, on a network whose oracle is deployed. */
+function watched(network: Network, vault: Address): VaultConfig | undefined {
+  if (NETWORKS[network].oracle === UNDEPLOYED) return undefined;
+  return NETWORKS[network].vaults.find((v) => v.address.toLowerCase() === vault.toLowerCase());
+}
+
 /** Durable Object named `${network}:${vault}`: an alarm loop that watches one vault. */
 export class VaultWatcher extends DurableObject<Env> {
   /** Built from env on first use; tests assign fakes. */
   deps: WatcherDeps | null = null;
 
   async start(network: Network, vault: Address): Promise<void> {
+    if (!watched(network, vault)) { await this.ctx.storage.deleteAlarm(); return; }
     const prev = await this.ctx.storage.get<WatchState>('state');
     await this.ctx.storage.put('state', { network, vault, last: prev?.last ?? null } satisfies WatchState);
     if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + ALARM_MS[network]);
@@ -153,11 +161,12 @@ export class VaultWatcher extends DurableObject<Env> {
   async alarm(): Promise<void> {
     const state = await this.ctx.storage.get<WatchState>('state');
     if (!state) return;
+    const vault = watched(state.network, state.vault);
+    if (!vault) return; // removed from config, or no oracle on that network: stop watching (no re-arm)
     try {
-      const vault = NETWORKS[state.network].vaults.find((v) => v.address.toLowerCase() === state.vault.toLowerCase());
-      if (!vault) return; // removed from config: stop watching
       const last = await watchOnce(this.env.DB, vault, state.network, state.last, this.deps ?? (this.deps = this.realDeps()));
-      await this.ctx.storage.put('state', { ...state, last } satisfies WatchState);
+      // watchOnce hands back the same object on a skip tick; only write when the judged stats moved.
+      if (last !== state.last) await this.ctx.storage.put('state', { ...state, last } satisfies WatchState);
     } finally {
       await this.ctx.storage.setAlarm(Date.now() + ALARM_MS[state.network]);
     }

@@ -2,9 +2,9 @@ import { env, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest';
 import { JevUnavailable } from '../../lib/jev';
 import type { DetailedPositionJudgment } from '../../lib/judge';
-import { NETWORKS } from '../../shared/networks';
+import { NETWORKS, UNDEPLOYED } from '../../shared/networks';
 import type { ExitJob } from '../src/env';
-import { HEARTBEAT_MS, VaultWatcher, watchOnce, type VaultReading, type WatcherDeps } from '../src/watcher';
+import { ALARM_MS, HEARTBEAT_MS, VaultWatcher, watchOnce, type VaultReading, type WatcherDeps } from '../src/watcher';
 
 const MIRROR = NETWORKS.testnet.vaults[0].address;
 const OWNER_A = '0x00000000000000000000000000000000000000a1' as const;
@@ -62,6 +62,33 @@ describe('VaultWatcher', () => {
     expect(calls.posts).toHaveLength(0);
     expect((await events()).filter((e) => e.owner === null).map((e) => e.type)).toEqual(['jev_unavailable']);
     expect(await alarmOf(stub)).not.toBeNull();
+  });
+
+  it('watcher: a vault removed from config stops ticking instead of re-arming forever', async () => {
+    const { deps, calls } = fakeDeps();
+    const gone = '0x000000000000000000000000000000000000dead' as const;
+    const stub = env.VAULT_WATCHER.get(env.VAULT_WATCHER.idFromName(`testnet:${gone}`));
+    // An orphan armed before the fix: state and alarm already in storage.
+    await runInDurableObject(stub, async (instance: VaultWatcher, state) => {
+      instance.deps = deps;
+      await state.storage.put('state', { network: 'testnet', vault: gone, last: null });
+      await state.storage.setAlarm(Date.now() + 1_000);
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(calls.judged).toBe(0);
+    expect(await alarmOf(stub)).toBeNull();
+  });
+
+  it.skipIf(NETWORKS.mainnet.oracle !== UNDEPLOYED)('watcher: start() on a network without an oracle arms nothing', async () => {
+    const { deps } = fakeDeps();
+    const vault = '0x00000000000000000000000000000000000000c3' as const;
+    const stub = env.VAULT_WATCHER.get(env.VAULT_WATCHER.idFromName(`mainnet:${vault}`));
+    await runInDurableObject(stub, async (instance: VaultWatcher) => { instance.deps = deps; await instance.start('mainnet', vault); });
+    expect(await alarmOf(stub)).toBeNull();
+  });
+
+  it('watcher: testnet ticks every 15 s (5 s overran Workers Free Durable Object limits)', () => {
+    expect(ALARM_MS.testnet).toBe(15_000);
   });
 
   it('watcher: util 9600 + Jev down → alert event', async () => {
