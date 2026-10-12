@@ -43,6 +43,7 @@ contract DeployV2 is Script {
         AdapterKinds.Cache memory cache;
         address[] memory adapters = new address[](vaults.length);
         for (uint256 i = 0; i < vaults.length; i++) {
+            AdapterKinds.check(vaults[i].adapterKind, vaults[i].vault);
             adapters[i] = AdapterKinds.adapterFor(vaults[i].adapterKind, cache);
             oracle.registerVault(vaults[i].vault, adapters[i]);
             guardian.setVaultApproved(vaults[i].vault, true);

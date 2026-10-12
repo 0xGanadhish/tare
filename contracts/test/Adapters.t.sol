@@ -104,16 +104,17 @@ contract EulerEarnAdapterTest is Test {
         usdc.mint(earn, idle);
     }
 
-    function test_eulerEarn_sumsIdleAndStrategies() public {
+    /// Euler Earn pays withdrawals only from its strategies; USDC sent to the vault itself is stranded.
+    function test_eulerEarn_sumsStrategies_ignoresIdleCash() public {
         address[] memory q = new address[](3);
         q[0] = address(new MockStrategy(0));
         q[1] = address(new MockStrategy(430_817_453_885));
         q[2] = address(new MockStrategy(0));
-        assertEq(adapter.availableLiquidity(_earn(q, 7e6)), 7e6 + 430_817_453_885);
+        assertEq(adapter.availableLiquidity(_earn(q, 7e6)), 430_817_453_885);
     }
 
-    function test_eulerEarn_emptyQueue_idleOnly() public {
-        assertEq(adapter.availableLiquidity(_earn(new address[](0), 5e6)), 5e6);
+    function test_eulerEarn_emptyQueue_zero() public {
+        assertEq(adapter.availableLiquidity(_earn(new address[](0), 5e6)), 0);
     }
 
     function test_eulerEarn_revertingStrategy_countsZero() public {
@@ -230,9 +231,23 @@ contract MorphoV2AdapterTest is Test {
         assertEq(adapter.availableLiquidity(_vault(address(marketAdapter), 3e6)), 3e6);
     }
 
-    function test_morphoV2_nonMorphoLiquidityAdapter_reverts() public {
-        address v = _vault(address(new NotMorphoAdapter()), 1e6);
-        vm.expectRevert();
-        adapter.availableLiquidity(v);
+    /// The allocator can switch the liquidity adapter at any time, and the oracle locks this adapter at the first
+    /// verdict, so an unreadable liquidity market must fall back to idle cash instead of reverting every read.
+    function test_morphoV2_nonMarketLiquidityAdapter_idleOnly() public {
+        assertEq(adapter.availableLiquidity(_vault(address(new NotMorphoAdapter()), 1e6)), 1e6);
+    }
+
+    function test_morphoV2_eoaLiquidityAdapter_idleOnly() public {
+        assertEq(adapter.availableLiquidity(_vault(address(0xBEEF), 1e6)), 1e6);
+    }
+
+    function test_morphoV2_morphoNotMorphoBlue_idleOnly() public {
+        MockMarketAdapter odd = new MockMarketAdapter(address(new NotMorphoAdapter()));
+        assertEq(adapter.availableLiquidity(_vault(address(odd), 1e6)), 1e6);
+    }
+
+    function test_morphoV2_morphoIsEoa_idleOnly() public {
+        MockMarketAdapter odd = new MockMarketAdapter(address(0xBEEF));
+        assertEq(adapter.availableLiquidity(_vault(address(odd), 1e6)), 1e6);
     }
 }

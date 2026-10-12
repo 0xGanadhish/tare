@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {MirrorAdapter} from "../src/adapters/MirrorAdapter.sol";
 import {EulerAdapter} from "../src/adapters/EulerAdapter.sol";
 import {EulerEarnAdapter} from "../src/adapters/EulerEarnAdapter.sol";
-import {MorphoV2Adapter} from "../src/adapters/MorphoV2Adapter.sol";
+import {IMorphoMarketAdapter, IMorphoVaultV2, MorphoV2Adapter} from "../src/adapters/MorphoV2Adapter.sol";
 
 /// @notice Maps a vault config's "adapter" kind to a liquidity adapter, deploying each kind once.
 /// Shared by DeployV2 and the fork tests so both register vaults the same way.
@@ -38,5 +38,19 @@ library AdapterKinds {
             return cache.morphoV2;
         }
         revert(string.concat("unknown adapter kind: ", kind));
+    }
+
+    /// @dev Deploy-time checks a kind needs beyond its adapter's read. The Morpho V2 adapter reads an unknown liquidity
+    /// adapter as idle-only (so a later allocator switch can't brick a locked adapter), so the deploy is where a vault
+    /// whose liquidity market Tare can't read is rejected.
+    function check(string memory kind, address vault) internal view {
+        if (keccak256(bytes(kind)) != keccak256("morpho-v2")) return;
+        address liqAdapter = IMorphoVaultV2(vault).liquidityAdapter();
+        if (liqAdapter == address(0)) return;
+        (bool ok, bytes memory ret) = liqAdapter.staticcall(abi.encodeCall(IMorphoMarketAdapter.morpho, ()));
+        require(
+            ok && ret.length == 32 && abi.decode(ret, (address)).code.length > 0,
+            "liquidity adapter is not a Morpho market adapter"
+        );
     }
 }

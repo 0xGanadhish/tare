@@ -21,7 +21,7 @@ The blocker is not the number of vaults; it's that Jev is blind to liquidity on 
 Two stateless, view-only contracts implement the existing `ILiquidityAdapter.availableLiquidity(address vault)`. Each is deployed once per network and shared by every vault of its type. They have no owner and no storage.
 
 **`EulerEarnAdapter`** (`contracts/src/adapters/EulerEarnAdapter.sol`)
-- Formula: `asset.balanceOf(vault) + Σ strategy.maxWithdraw(vault)` over `withdrawQueue(0 … withdrawQueueLength-1)`.
+- Formula: `Σ strategy.maxWithdraw(vault)` over `withdrawQueue(0 … withdrawQueueLength-1)`. Euler Earn pays withdrawals only from its strategies, so USDC sent straight to the vault is stranded and not counted (final review: a 1M USDC donation on a fork did not change what could be withdrawn).
 - A strategy whose `maxWithdraw` reverts counts as 0. One paused market must not make `metricsOf` revert, because that would grade the verdict `REASON_BROKEN`.
 - Today, Clearstar Earn USDC: 0 + 430.8k + 0 across 3 strategies, against a TVL of 5.79M (7.4%).
 
@@ -32,7 +32,7 @@ Two stateless, view-only contracts implement the existing `ILiquidityAdapter.ava
   - Decode `liquidityData` as Morpho Blue `MarketParams`, with `id = keccak256(liquidityData)`.
   - Read `morpho = liquidityAdapter.morpho()`, `market(id)` and `position(id, liquidityAdapter)`.
   - Add `min(supplyShares × totalSupplyAssets / totalSupplyShares, totalSupplyAssets − totalBorrowAssets)`, rounding down. Cash (supply − borrow) is exact between interest accruals.
-- If the liquidity adapter is not a Morpho market adapter (no `morpho()`, or bad `liquidityData`), it reverts. The deploy check catches this, and the vault is left out.
+- If the liquidity adapter is not a readable Morpho market adapter (no `morpho()`, or a market or position read that fails), the market counts as 0 and the adapter returns idle only. It must not revert: the allocator can switch the liquidity adapter without a timelock, and the oracle locks the adapter at the first verdict, so a revert would stop verdicts on that vault for good. The deploy check (`AdapterKinds.check`) rejects such a vault up front, so it is left out.
 - Today:
   - August USDC V2: min(8.03M, 699.7k) = 699.7k (8.7%).
   - Hyperithm USDC Apex: idle only, 2.98M of 51.7M (5.8%).
@@ -44,7 +44,8 @@ Two stateless, view-only contracts implement the existing `ILiquidityAdapter.ava
   - an empty queue
   - Morpho with cash below our position, and above it
   - no liquidity market
-  - a non-Morpho liquidity adapter (expect a revert)
+  - a non-Morpho liquidity adapter, an EOA one, and a `morpho()` that isn't Morpho Blue (idle only; the deploy check reverts)
+  - a USDC donation on the fork must not raise the adapter above what can be withdrawn
 - Fork tests on rpc.monad.xyz for all three vaults:
   - the adapter value equals a total computed independently in the test
   - the value is greater than 0 and no more than `totalAssets`

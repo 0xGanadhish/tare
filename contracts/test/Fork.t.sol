@@ -14,7 +14,8 @@ import {AdapterKinds} from "../script/AdapterKinds.sol";
 /// Skips when the RPC env var is unset or the vault list is empty.
 contract ForkTest is Test {
     address constant USDC = 0x754704Bc059F8C67012fEd69BC8A327a5aafb603;
-    uint256 constant AMOUNT = 100e6;
+    /// Spec rule 4: Guardian fully exits a 1,000 USDC position.
+    uint256 constant AMOUNT = 1_000e6;
 
     address owner = makeAddr("owner");
     address attester = makeAddr("attester");
@@ -47,6 +48,7 @@ contract ForkTest is Test {
     {
         oracle = new TareRiskOracle(owner, attester, 86_400);
         guardian = new GuardianV2(owner, oracle);
+        AdapterKinds.check(kind, vault);
         AdapterKinds.Cache memory cache;
         adapter = AdapterKinds.adapterFor(kind, cache);
         vm.startPrank(owner);
@@ -84,7 +86,7 @@ contract ForkTest is Test {
     function testFork_realVault_redeemByAllowance() public {
         (address[] memory vaults, string[] memory kinds) = _vaults();
         for (uint256 i = 0; i < vaults.length; i++) {
-            _exitFlow(vaults[i], kinds[i], AMOUNT, 99.9e6);
+            _exitFlow(vaults[i], kinds[i], AMOUNT, 999e6);
         }
     }
 
@@ -107,18 +109,36 @@ contract ForkTest is Test {
             uint256 liq = ILiquidityAdapter(adapter).availableLiquidity(vault);
             assertGt(liq, 0, "some liquidity");
             assertLe(liq, IERC4626(vault).totalAssets(), "liquidity <= TVL");
-            deal(vault, holder, IERC4626(vault).convertToShares(liq + 2e6) + 1, false);
-
-            uint256 snap = vm.snapshotState();
-            vm.prank(holder);
-            vm.expectRevert();
-            IERC4626(vault).withdraw(liq + 1e6, holder, holder);
-            vm.revertToState(snap);
-
-            vm.prank(holder);
-            IERC4626(vault).withdraw(liq - 10, holder, holder);
-            vm.revertToState(snap);
+            _assertWithdrawable(vault, liq, holder);
         }
+    }
+
+    /// USDC sent straight to a vault (by accident or to fake liquidity) must not raise the adapter's number above
+    /// what can actually be withdrawn.
+    function testFork_donationDoesNotInflateLiquidity() public {
+        (address[] memory vaults, string[] memory kinds) = _vaults();
+        address holder = makeAddr("holder");
+        for (uint256 i = 0; i < vaults.length; i++) {
+            address vault = vaults[i];
+            (,, address adapter) = _setup(vault, kinds[i]);
+            deal(USDC, vault, IERC20(USDC).balanceOf(vault) + 1_000_000e6);
+            _assertWithdrawable(vault, ILiquidityAdapter(adapter).availableLiquidity(vault), holder);
+        }
+    }
+
+    /// A holder with enough shares can withdraw just under `liq`, and 1 USDC over it fails.
+    function _assertWithdrawable(address vault, uint256 liq, address holder) internal {
+        deal(vault, holder, IERC4626(vault).convertToShares(liq + 2e6) + 1, false);
+
+        uint256 snap = vm.snapshotState();
+        vm.prank(holder);
+        vm.expectRevert();
+        IERC4626(vault).withdraw(liq + 1e6, holder, holder);
+        vm.revertToState(snap);
+
+        vm.prank(holder);
+        IERC4626(vault).withdraw(liq - 10, holder, holder);
+        vm.revertToState(snap);
     }
 
     function testFork_resolve_realVault() public {

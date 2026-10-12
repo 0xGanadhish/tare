@@ -28,21 +28,38 @@ interface IMorphoBlue {
 
 /// @notice Liquidity adapter for Morpho Vault V2: idle assets plus what a withdrawal can pull from the vault's
 /// liquidity market. V2 only deallocates from `liquidityAdapter()` (with `liquidityData()`) on withdraw; other
-/// allocations need curator action, so they are not instant liquidity. Reverts if the liquidity adapter is not
-/// a Morpho market adapter, so such a vault fails the deploy check instead of being graded wrongly.
+/// allocations need curator action, so they are not instant liquidity.
+/// The allocator can switch the liquidity adapter at any time and the oracle locks this adapter at a vault's first
+/// verdict, so a liquidity market this contract can't read counts as 0 (idle only) instead of reverting every read.
+/// DeployV2 rejects such a vault up front (AdapterKinds.check). Morpho's market totals exclude interest not yet
+/// accrued, which only makes the market share slightly low.
 contract MorphoV2Adapter is ILiquidityAdapter {
     function availableLiquidity(address vault) external view returns (uint256 liquidity) {
         IMorphoVaultV2 v = IMorphoVaultV2(vault);
         liquidity = IERC20(v.asset()).balanceOf(vault);
         address liqAdapter = v.liquidityAdapter();
         if (liqAdapter == address(0)) return liquidity;
+        liquidity += _marketLiquidity(liqAdapter, keccak256(v.liquidityData()));
+    }
 
-        IMorphoBlue morpho = IMorphoBlue(IMorphoMarketAdapter(liqAdapter).morpho());
-        bytes32 id = keccak256(v.liquidityData());
-        (uint128 supplyAssets, uint128 supplyShares, uint128 borrowAssets,,,) = morpho.market(id);
-        if (supplyShares == 0 || borrowAssets >= supplyAssets) return liquidity;
-        (uint256 shares,,) = morpho.position(id, liqAdapter);
-        uint256 ours = Math.mulDiv(shares, supplyAssets, supplyShares);
-        liquidity += Math.min(ours, supplyAssets - borrowAssets);
+    /// @dev What the liquidity market can pay `liqAdapter` now: its supply, capped by the market's cash. Every call
+    /// is low-level with a length check, so an EOA or a contract of another shape reads as 0.
+    function _marketLiquidity(address liqAdapter, bytes32 id) internal view returns (uint256) {
+        (bool ok, bytes memory ret) = liqAdapter.staticcall(abi.encodeCall(IMorphoMarketAdapter.morpho, ()));
+        if (!ok || ret.length != 32) return 0;
+        uint256 raw = abi.decode(ret, (uint256));
+        if (raw > type(uint160).max) return 0;
+        address morpho = address(uint160(raw));
+
+        (ok, ret) = morpho.staticcall(abi.encodeCall(IMorphoBlue.market, (id)));
+        if (!ok || ret.length != 192) return 0;
+        (uint256 supplyAssets, uint256 supplyShares, uint256 borrowAssets,,,) =
+            abi.decode(ret, (uint256, uint256, uint256, uint256, uint256, uint256));
+        if (supplyShares == 0 || borrowAssets >= supplyAssets) return 0;
+
+        (ok, ret) = morpho.staticcall(abi.encodeCall(IMorphoBlue.position, (id, liqAdapter)));
+        if (!ok || ret.length != 96) return 0;
+        (uint256 shares,,) = abi.decode(ret, (uint256, uint256, uint256));
+        return Math.min(Math.mulDiv(shares, supplyAssets, supplyShares), supplyAssets - borrowAssets);
     }
 }
