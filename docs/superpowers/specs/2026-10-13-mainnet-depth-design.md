@@ -59,15 +59,15 @@ Two stateless, view-only contracts implement the existing `ILiquidityAdapter.ava
 4. Guardian can fully exit a 1,000 USDC position on a mainnet fork: deposit, enable, post EXIT, `exit()`, with the balance at 0 and the verdict consumed. This extends the existing `Fork.t.sol`.
 5. The adapter returns a value greater than 0 and no more than TVL on the fork.
 
-**Selected (about $65M TVL):**
+**Selected (about $14M TVL):**
 
 | Vault | Type | Address | DefiLlama pool | Adapter kind |
 |---|---|---|---|---|
 | Clearstar Earn USDC | Euler Earn | `0xE1BcA19baA63894D374578320551633320436523` | `d711af54-e736-470f-8a22-431a23de76df` | `euler-earn` |
 | August USDC V2 | Morpho V2 | `0x80017bF0f793EBbE9679Cd61ff0e395B62CAbB59` | `0b033747-3a22-486b-a600-9958b878bef7` | `morpho-v2` |
-| Hyperithm USDC Apex | Morpho V2 | `0x78999cc96d2Ba0341588C60CcB0E91c6C33CF371` | `ec6a71a7-41ae-4e72-942f-b4bc99c3b3cb` | `morpho-v2` |
 
 **Excluded:**
+- **Hyperithm USDC Apex** (`0x7899…F371`, 51.2M, `morpho-v2`) passes all five rules but is left out of the first deploy (user decision, 2026-10-13): it has no liquidity market and only 3.7% idle, under the oracle's 5% `LIQ_FLOOR_BPS`, so its HOLD verdicts would grade adverse. It can be registered later, once it is back above 5%.
 - **Saturn USDC** (`0x7575…C079`, 3.02M) fails rule 4: idle cash is about $9 and it has no liquidity market, so Guardian couldn't get anyone out.
 - Other Euler USDC pools on Monad are under $1M (rule 3).
 

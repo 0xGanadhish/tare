@@ -68,7 +68,8 @@ describe('/app/docs', () => {
   test('Networks page lists the covered mainnet vaults and how often each is checked', async () => {
     await topicPage('networks');
     const text = document.body.textContent ?? '';
-    for (const name of ['Clearstar Earn USDC', 'August USDC V2', 'Hyperithm USDC Apex']) expect(text).toContain(name);
+    for (const name of ['Clearstar Earn USDC', 'August USDC V2']) expect(text).toContain(name);
+    expect(text).not.toContain('Hyperithm'); // left out at deploy: under the 5% cash floor (2026-10-13)
     expect(text).toContain('15 seconds');
   });
 

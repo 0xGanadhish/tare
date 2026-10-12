@@ -13,13 +13,6 @@
       "protocol": "morpho",
       "poolId": "0b033747-3a22-486b-a600-9958b878bef7",
       "adapter": "morpho-v2"
-    },
-    {
-      "address": "0x78999cc96d2Ba0341588C60CcB0E91c6C33CF371",
-      "name": "Hyperithm USDC Apex",
-      "protocol": "morpho",
-      "poolId": "ec6a71a7-41ae-4e72-942f-b4bc99c3b3cb",
-      "adapter": "morpho-v2"
     }
   ]
 }
