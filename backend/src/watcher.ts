@@ -12,11 +12,11 @@ import { afterJudgment, decide } from './decide';
 import type { Env, ExitJob } from './env';
 import { realEnvioDeps, readFlows, readProtections } from './envio';
 import { safeError } from './errors';
+import { ALARM_MS } from './cadence';
 import { addEvent } from './events';
 import { readVault } from './vaultReader';
 
-/** Workers Free allows 100k Durable Object requests a day; 4 testnet vaults at 5 s used ~69k of that on alarms alone. */
-export const ALARM_MS: Record<Network, number> = { testnet: 15_000, mainnet: 30_000 };
+export { ALARM_MS };
 /**
  * How often a steady watcher refreshes its vault_health row. Posts and error changes are written at once; the plain
  * "still alive" write waits this long, because a 5 s heartbeat for every testnet vault alone overruns D1 Free's 100k rows/day.

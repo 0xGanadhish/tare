@@ -107,9 +107,9 @@ export function Callout({ tone = 'note', title, children }: { tone?: 'note' | 'w
 }
 
 /** Rule checklist (Guardian's checks, grading criteria). */
-export function Checklist({ items, mark = '✓' }: { items: ReactNode[]; mark?: string }) {
+export function Checklist({ items, mark = '✓', label }: { items: ReactNode[]; mark?: string; label?: string }) {
   return (
-    <ul className="mt-4 divide-y divide-hairline overflow-hidden rounded-xl border border-hairline bg-white">
+    <ul aria-label={label} className="mt-4 divide-y divide-hairline overflow-hidden rounded-xl border border-hairline bg-white">
       {items.map((item, i) => (
         <li key={i} className="flex gap-3 px-4 py-3 text-[14px] leading-snug text-secondary">
           <span aria-hidden className="mono mt-[1px] text-[12px] text-deposit">{mark}</span>

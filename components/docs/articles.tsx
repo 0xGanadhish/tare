@@ -5,6 +5,7 @@ import { EARLY_BELOW } from '@/shared/score';
 import { MIN_BAND_VERDICTS } from '@/components/ledger/format';
 import { MAINNET_SOFT_CAP_USD, NETWORKS, UNDEPLOYED, type Network } from '@/shared/networks';
 import { addressUrl } from '@/components/tx/explorer';
+import mainnetVaultConfig from '@/contracts/script/vaults.mainnet.json';
 import { A, Callout, Checklist, Code, Facts, Flow, OneLine, Section, Stamp, Steps, Strong, Table, Terms, VerdictRows, paper } from './blocks';
 
 /*
@@ -20,7 +21,9 @@ export const GUARDIAN = { minPct: 80, maxPct: 99, defaultPct: 90, freshness: [5,
 /** How long the oracle waits before a verdict can be graded (TareRiskOracle `resolveWindow`). */
 export const RESOLVE_WINDOW: Record<Network, string> = { testnet: '1 hour', mainnet: '24 hours' };
 /** How often each vault is checked (backend `ALARM_MS`). */
-export const CHECK_EVERY: Record<Network, string> = { testnet: '5 seconds', mainnet: '30 seconds' };
+export const CHECK_EVERY: Record<Network, string> = { testnet: '15 seconds', mainnet: '30 seconds' };
+/** Mainnet vaults Tare covers: the live config once deployed, else the vaults the deploy will register. */
+const MAINNET_VAULT_NAMES = (NETWORKS.mainnet.vaults.length ? NETWORKS.mainnet.vaults : mainnetVaultConfig.vaults).map((v) => v.name);
 /** Net outflow over the last hour, as a share of the vault, that makes Jev look again (backend `OUTFLOW_REJUDGE_PCT`). */
 export const OUTFLOW_PCT = 10;
 
@@ -348,6 +351,23 @@ function Guardian() {
           Guardian covers. It has no other power.
         </p>
       </Section>
+      <Section id="vaults" title="Which vaults Guardian covers">
+        <p>On mainnet, Tare only watches a vault if it passes all five of these checks:</p>
+        <Checklist
+          label="Vault rules"
+          items={[
+            'It holds real USDC and passes Tare’s contract checks.',
+            'It is an Euler Earn or Morpho V2 vault, the two kinds where Tare can read how much cash can leave.',
+            'It holds at least $1M.',
+            'On a copy of mainnet, Guardian fully exits a 1,000 USDC position from it.',
+            'The cash Tare reads is above zero and no more than the vault holds.',
+          ]}
+        />
+        <p className="mt-4">
+          Saturn USDC is an example of a vault Guardian can&apos;t protect: almost none of its $3M sits idle, and withdrawals wait on its curator to free up
+          cash, so an exit could return nothing.
+        </p>
+      </Section>
       <Section id="edges" title="Edge cases">
         <Terms
           items={[
@@ -440,6 +460,7 @@ function Networks() {
             ['Money', 'Test tokens with no value', 'Real money'],
             ['Vaults', 'Mirror vaults that copy real vaults’ APY', 'Approved real vaults'],
             ['Deposit cap in the app', 'None', `$${MAINNET_SOFT_CAP_USD.toLocaleString('en-US')} per wallet`],
+            ['Each vault checked every', CHECK_EVERY.testnet, CHECK_EVERY.mainnet],
             ['Verdict graded after', RESOLVE_WINDOW.testnet, RESOLVE_WINDOW.mainnet],
             ['Faucet', yes(t.features.faucet), yes(m.features.faucet)],
             ['Demo controls', yes(t.features.demoControls), yes(m.features.demoControls)],
@@ -464,6 +485,8 @@ function Networks() {
         <p>
           A <Strong>Real funds</Strong> banner stays at the top of every page. If your wallet is on the other chain, the app shows a button to switch it.
         </p>
+        <p>Tare watches these real USDC vaults. Guardian explains how they were picked.</p>
+        <Checklist items={MAINNET_VAULT_NAMES} mark="·" />
       </Section>
       <Section id="switch" title="How the app remembers your choice">
         <p>

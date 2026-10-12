@@ -6,7 +6,8 @@ const nav = vi.hoisted(() => ({ notFound: vi.fn(() => { throw new Error('NEXT_NO
 vi.mock('next/navigation', () => ({ notFound: nav.notFound }));
 
 import { DOC_TOPICS } from './topics';
-import { API_ROUTES, GUARDIAN } from './articles';
+import { API_ROUTES, CHECK_EVERY, GUARDIAN } from './articles';
+import { ALARM_MS } from '@/backend/src/cadence';
 import { FRESHNESS_MINUTES, MAX_CONFIDENCE_PCT, MIN_CONFIDENCE_PCT } from '@/components/advisor/ProtectStep';
 import { PUBLIC_ROUTES } from '@/backend/src/root';
 import DocsHub from '@/app/(app)/app/docs/page';
@@ -62,6 +63,26 @@ describe('/app/docs', () => {
     expect(API_ROUTES.map(([r]) => r)).toEqual([...PUBLIC_ROUTES]);
     expect([GUARDIAN.minPct, GUARDIAN.maxPct]).toEqual([MIN_CONFIDENCE_PCT, MAX_CONFIDENCE_PCT]);
     expect([...GUARDIAN.freshness]).toEqual([...FRESHNESS_MINUTES]);
+  });
+
+  test('Networks page lists the covered mainnet vaults and how often each is checked', async () => {
+    await topicPage('networks');
+    const text = document.body.textContent ?? '';
+    for (const name of ['Clearstar Earn USDC', 'August USDC V2', 'Hyperithm USDC Apex']) expect(text).toContain(name);
+    expect(text).toContain('15 seconds');
+  });
+
+  test('Guardian page lists the five vault rules and uses Saturn as the vault it cannot protect', async () => {
+    await topicPage('guardian');
+    const rules = screen.getByRole('list', { name: 'Vault rules' });
+    expect(within(rules).getAllByRole('listitem')).toHaveLength(5);
+    expect(rules.textContent).toMatch(/\$1M/);
+    expect(rules.textContent).toMatch(/1,000 USDC/);
+    expect(document.body.textContent).toMatch(/Saturn USDC[^.]*curator/);
+  });
+
+  test('check intervals in the docs match the watcher', () => {
+    expect(CHECK_EVERY).toEqual({ testnet: `${ALARM_MS.testnet / 1000} seconds`, mainnet: `${ALARM_MS.mainnet / 1000} seconds` });
   });
 
   test('an unknown topic is a 404', async () => {
