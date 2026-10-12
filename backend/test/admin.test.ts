@@ -169,6 +169,28 @@ describe('health', () => {
     expect(res.status).toBe(503);
   });
 
+  it('health: mainnet attester below 0.5 MON → 503', async () => {
+    await tick(2);
+    const res = await handleHealth(env, {
+      networks: () => ['testnet', 'mainnet'],
+      balanceOf: async (n, role) => (n === 'mainnet' && role === 'attester' ? 4n * 10n ** 17n : 10n ** 18n),
+    });
+    expect(res.status).toBe(503);
+  });
+
+  it('health: testnet key at 0.4 MON stays green', async () => {
+    await tick(2);
+    const res = await handleHealth(env, { ...healthy, balanceOf: async (_n, role) => (role === 'attester' ? 4n * 10n ** 17n : 10n ** 18n) });
+    expect(res.status).toBe(200);
+  });
+
+  it('health: mainnet keys not configured stay green', async () => {
+    await tick(2);
+    const res = await handleHealth(env, { networks: () => ['testnet', 'mainnet'], balanceOf: async (n) => (n === 'mainnet' ? null : 10n ** 18n) });
+    expect(res.status).toBe(200);
+    expect((await res.json<{ balances: Record<string, Record<string, string | null>> }>()).balances.mainnet.attester).toBeNull();
+  });
+
   it('health: counts exits waiting on a retry as backlog', async () => {
     await tick(2);
     await env.DB.prepare(`INSERT INTO exits (network, verdict_id, owner, status, at) VALUES ('testnet', '1', '0xa', 'failed', 'x'), ('testnet', '2', '0xb', 'confirmed', 'x')`).run();

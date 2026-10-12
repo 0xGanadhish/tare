@@ -6,7 +6,8 @@ import { rpcFor, secretFor, type Env, type KeyRole } from './env';
 import { json } from './http';
 import { HEARTBEAT_MS } from './watcher';
 
-export const MIN_BALANCE_WEI = 5n * 10n ** 16n; // 0.05 MON
+/** Below this a key goes red. Mainnet: ~15 verdict posts at ~0.028 MON each, so the warning comes hours before posts stop. */
+export const MIN_BALANCE_WEI: Record<Network, bigint> = { testnet: 5n * 10n ** 16n, mainnet: 5n * 10n ** 17n }; // 0.05 / 0.5 MON
 const ROLES: KeyRole[] = ['attester', 'executor'];
 
 export interface HealthDeps {
@@ -50,7 +51,7 @@ export async function handleHealth(env: Env, deps: HealthDeps = realHealthDeps(e
     balances[network] = {};
     for (const role of ROLES) {
       const wei = await deps.balanceOf(network, role).catch(() => null);
-      if (wei !== null && wei < MIN_BALANCE_WEI) lowBalance = true;
+      if (wei !== null && wei < MIN_BALANCE_WEI[network]) lowBalance = true;
       balances[network][role] = wei === null ? null : formatEther(wei);
     }
   }
