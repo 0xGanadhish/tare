@@ -151,7 +151,11 @@ export class VaultWatcher extends DurableObject<Env> {
     if (!watched(network, vault)) { await this.ctx.storage.deleteAlarm(); return; }
     const prev = await this.ctx.storage.get<WatchState>('state');
     await this.ctx.storage.put('state', { network, vault, last: prev?.last ?? null } satisfies WatchState);
-    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + ALARM_MS[network]);
+    // Re-arm unless a normal tick is already pending: an overdue alarm, or one pushed far out by retry backoff
+    // (e.g. after hitting a plan limit), would otherwise leave the watcher silent.
+    const at = await this.ctx.storage.getAlarm();
+    const now = Date.now();
+    if (at === null || at < now || at > now + ALARM_MS[network]) await this.ctx.storage.setAlarm(now + ALARM_MS[network]);
   }
 
   async stop(): Promise<void> {

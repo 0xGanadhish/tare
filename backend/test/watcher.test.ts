@@ -87,6 +87,34 @@ describe('VaultWatcher', () => {
     expect(await alarmOf(stub)).toBeNull();
   });
 
+  it('watcher: start() replaces a stuck alarm (overdue, or further out than one tick)', async () => {
+    const { deps } = fakeDeps();
+    for (const offset of [-10 * 60_000, 60 * 60_000]) {
+      const stub = env.VAULT_WATCHER.get(env.VAULT_WATCHER.idFromName(`testnet:${MIRROR}:${crypto.randomUUID()}`));
+      await runInDurableObject(stub, async (instance: VaultWatcher, state) => {
+        instance.deps = deps;
+        await state.storage.setAlarm(Date.now() + offset);
+        await instance.start('testnet', MIRROR);
+      });
+      const at = await alarmOf(stub);
+      expect(at).not.toBeNull();
+      expect(at! - Date.now()).toBeGreaterThan(0);
+      expect(at! - Date.now()).toBeLessThanOrEqual(ALARM_MS.testnet);
+    }
+  });
+
+  it('watcher: start() keeps a healthy alarm', async () => {
+    const { deps } = fakeDeps();
+    const stub = env.VAULT_WATCHER.get(env.VAULT_WATCHER.idFromName(`testnet:${MIRROR}:${crypto.randomUUID()}`));
+    const soon = Date.now() + 5_000;
+    await runInDurableObject(stub, async (instance: VaultWatcher, state) => {
+      instance.deps = deps;
+      await state.storage.setAlarm(soon);
+      await instance.start('testnet', MIRROR);
+    });
+    expect(await alarmOf(stub)).toBe(soon);
+  });
+
   it('watcher: testnet ticks every 15 s (5 s overran Workers Free Durable Object limits)', () => {
     expect(ALARM_MS.testnet).toBe(15_000);
   });
