@@ -5,14 +5,21 @@
       "name": "Clearstar Earn USDC",
       "protocol": "euler",
       "poolId": "d711af54-e736-470f-8a22-431a23de76df",
-      "adapter": "none"
+      "adapter": "euler-earn"
     },
     {
       "address": "0x80017bF0f793EBbE9679Cd61ff0e395B62CAbB59",
       "name": "August USDC V2",
       "protocol": "morpho",
       "poolId": "0b033747-3a22-486b-a600-9958b878bef7",
-      "adapter": "none"
+      "adapter": "morpho-v2"
+    },
+    {
+      "address": "0x78999cc96d2Ba0341588C60CcB0E91c6C33CF371",
+      "name": "Hyperithm USDC Apex",
+      "protocol": "morpho",
+      "poolId": "ec6a71a7-41ae-4e72-942f-b4bc99c3b3cb",
+      "adapter": "morpho-v2"
     }
   ]
 }

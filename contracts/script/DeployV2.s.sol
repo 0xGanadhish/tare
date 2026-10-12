@@ -5,12 +5,12 @@ import {Script, console} from "forge-std/Script.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {TareRiskOracle} from "../src/TareRiskOracle.sol";
 import {GuardianV2} from "../src/GuardianV2.sol";
-import {MirrorAdapter} from "../src/adapters/MirrorAdapter.sol";
-import {EulerAdapter} from "../src/adapters/EulerAdapter.sol";
+import {AdapterKinds} from "./AdapterKinds.sol";
 
 /// @notice Chain-aware Guardian v2 deploy: 10143 = Monad testnet, 143 = Monad mainnet.
 /// Testnet guards the existing mirrors (MirrorAdapter); mainnet guards script/vaults.mainnet.json.
-/// vaults.mainnet.json entries: {address, name, poolId, protocol: euler|morpho, adapter: euler|none}.
+/// vaults.mainnet.json entries: {address, name, poolId, protocol: euler|morpho, adapter: <kind>}, where kind is one of
+/// none | mirror | euler | euler-earn | morpho-v2 (see AdapterKinds). Every vault must end up with a liquidity adapter.
 /// Env: ATTESTER (required), OWNER (defaults to the broadcaster and must equal it, since it registers vaults).
 /// Merges oracle, guardianV2, usdc, deployBlockV2 and vaults into ../shared/addresses.<net>.json, keeping
 /// the v1 fields, only when WRITE_ADDRESSES=true.
@@ -40,20 +40,19 @@ contract DeployV2 is Script {
         require(owner == msg.sender, "OWNER must be the broadcaster");
         TareRiskOracle oracle = new TareRiskOracle(owner, attester, mainnet ? 86_400 : 3_600);
         GuardianV2 guardian = new GuardianV2(owner, oracle);
-        address mirrorAdapter;
-        address eulerAdapter;
+        AdapterKinds.Cache memory cache;
         address[] memory adapters = new address[](vaults.length);
         for (uint256 i = 0; i < vaults.length; i++) {
-            bytes32 kind = keccak256(bytes(vaults[i].adapterKind));
-            if (kind == keccak256("mirror")) {
-                if (mirrorAdapter == address(0)) mirrorAdapter = address(new MirrorAdapter());
-                adapters[i] = mirrorAdapter;
-            } else if (kind == keccak256("euler")) {
-                if (eulerAdapter == address(0)) eulerAdapter = address(new EulerAdapter());
-                adapters[i] = eulerAdapter;
-            }
+            adapters[i] = AdapterKinds.adapterFor(vaults[i].adapterKind, cache);
             oracle.registerVault(vaults[i].vault, adapters[i]);
             guardian.setVaultApproved(vaults[i].vault, true);
+        }
+        // An adapter locks at a vault's first verdict, so prove each one reads sensibly before anything is sent.
+        for (uint256 i = 0; i < vaults.length; i++) {
+            (, uint256 assets, uint256 liq) = oracle.metricsOf(vaults[i].vault);
+            require(liq != type(uint256).max, "vault has no liquidity adapter");
+            require(liq <= assets, "liquidity above TVL");
+            console.log(vaults[i].name, "liquidity bps of TVL:", assets == 0 ? 0 : liq * 10_000 / assets);
         }
         vm.stopBroadcast();
 
