@@ -2,6 +2,9 @@ name = "tare-backend"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
+# Public API at api.tarefi.xyz; the workers.dev URL stays on so nothing breaks while clients move over.
+workers_dev = true
+routes = [{ pattern = "api.tarefi.xyz", custom_domain = true }]
 
 [observability]
 enabled = true

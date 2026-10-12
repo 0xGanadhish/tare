@@ -6,6 +6,7 @@ import { safeError } from './errors';
 import { handleExitBatch } from './exits';
 import { handleHealth } from './health';
 import { error } from './http';
+import { apiIndex } from './root';
 
 // Must match [triggers] crons in wrangler.toml.
 export const CRON_SCAN = '*/10 * * * *';
@@ -26,7 +27,9 @@ function exposeJevKey(env: Env) {
 export default {
   async fetch(request, env) {
     try {
-      if (request.method === 'GET' && new URL(request.url).pathname === '/health') return await handleHealth(env);
+      const { pathname } = new URL(request.url);
+      if (request.method === 'GET' && pathname === '/') return apiIndex();
+      if (request.method === 'GET' && (pathname === '/health' || pathname === '/v1/health')) return await handleHealth(env);
       return (await handleRead(request, env)) ?? (await handleAdmin(request, env)) ?? error(404, 'not_found');
     } catch (err) {
       console.error(JSON.stringify({ msg: 'request_failed', path: new URL(request.url).pathname, error: safeError(err) }));
