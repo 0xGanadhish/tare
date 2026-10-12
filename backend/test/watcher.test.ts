@@ -51,6 +51,14 @@ async function startWatcher(deps: WatcherDeps) {
 
 const events = async () => (await env.DB.prepare('SELECT type, owner, message FROM events ORDER BY at, id').all<{ type: string; owner: string | null; message: string }>()).results;
 const alarmOf = (stub: DurableObjectStub) => runInDurableObject(stub, (_i, state) => state.storage.getAlarm());
+async function pendingAlarmOf(stub: DurableObjectStub): Promise<number | null> {
+  for (let i = 0; i < 40; i++) {
+    const at = await alarmOf(stub);
+    if (at !== null) return at;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  return null;
+}
 
 describe('VaultWatcher', () => {
   beforeEach(async () => { await env.DB.exec('DELETE FROM events; DELETE FROM vault_health; DELETE FROM posts;'); });
@@ -96,7 +104,8 @@ describe('VaultWatcher', () => {
         await state.storage.setAlarm(Date.now() + offset);
         await instance.start('testnet', MIRROR);
       });
-      const at = await alarmOf(stub);
+      // An overdue alarm fires at once in the test runtime; while it runs, getAlarm() is briefly null until it re-arms.
+      const at = await pendingAlarmOf(stub);
       expect(at).not.toBeNull();
       expect(at! - Date.now()).toBeGreaterThan(0);
       expect(at! - Date.now()).toBeLessThanOrEqual(ALARM_MS.testnet);
