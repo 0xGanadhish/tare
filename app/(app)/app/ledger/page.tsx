@@ -9,6 +9,7 @@ import { LedgerTable } from '@/components/ledger/LedgerTable';
 import { Scoreboard } from '@/components/ledger/Scoreboard';
 import { verdictLabel } from '@/components/ledger/format';
 import { useNetwork } from '@/components/network/NetworkProvider';
+import { Select } from '@/components/ui/Select';
 
 type Page = { verdicts: LedgerVerdict[]; cursor: string | null; source: 'fixtures' | 'backend' };
 const STATE_BASE = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || null;
@@ -47,7 +48,7 @@ export default function LedgerPage() {
     [pages.data, verdict],
   );
   const sample = pages.data?.pages[0]?.source === 'fixtures';
-  const select = 'mono rounded-lg border border-hairline bg-white px-2.5 py-1.5 text-[12px]';
+  const select = 'mono rounded-lg border border-hairline bg-white py-1.5 pl-2.5 text-[12px]';
 
   return (
     <div>
@@ -65,22 +66,22 @@ export default function LedgerPage() {
       <div className="mt-6 flex flex-wrap items-center gap-3 text-[12px]">
         <label className="flex items-center gap-2 text-secondary">
           Network
-          <select className={select} value={network} onChange={(e) => { setNetwork(e.target.value as Network); setVault(''); }}>
+          <Select className={select} value={network} onChange={(e) => { setNetwork(e.target.value as Network); setVault(''); }}>
             {NETWORK_IDS.map((n) => <option key={n} value={n}>{n === 'mainnet' ? 'Mainnet' : 'Testnet'}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="flex items-center gap-2 text-secondary">
           Vault
-          <select className={select} value={vault} onChange={(e) => setVault(e.target.value)}>
+          <Select className={select} value={vault} onChange={(e) => setVault(e.target.value)}>
             <option value="">All vaults</option>
             {NETWORKS[network].vaults.map((v) => <option key={v.address} value={v.address}>{v.name}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="flex items-center gap-2 text-secondary">
           Verdict
-          <select className={select} value={verdict} onChange={(e) => setVerdict(e.target.value as (typeof VERDICTS)[number])}>
+          <Select className={select} value={verdict} onChange={(e) => setVerdict(e.target.value as (typeof VERDICTS)[number])}>
             {VERDICTS.map((v) => <option key={v} value={v}>{v === 'all' ? 'All' : v}</option>)}
-          </select>
+          </Select>
         </label>
       </div>
 

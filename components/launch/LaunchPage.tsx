@@ -7,6 +7,7 @@ import { abis, addresses } from '@/shared/contracts';
 import type { Address, Pool, Verdict } from '@/shared/types';
 import { TxButton } from '@/components/tx/TxButton';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { Deploying } from './Deploying';
 import { TokenCard } from './TokenCard';
 
@@ -65,10 +66,10 @@ function Launch({ factory }: { factory: Address }) {
               <input value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="TICKER" required className="mono mt-2 block w-full rounded-lg border border-hairline bg-paper px-3 py-3 outline-none focus:border-deposit" />
             </label>
             <label className="block text-sm">Reserve vault
-              <select value={reserve ?? ''} onChange={(event) => setSelection(event.target.value as Address)} disabled={!mirrors.length} className="mt-2 block w-full min-w-0 rounded-lg border border-hairline bg-paper px-3 py-3 text-sm outline-none focus:border-deposit">
+              <Select value={reserve ?? ''} onChange={(event) => setSelection(event.target.value as Address)} disabled={!mirrors.length} wrapperClassName="mt-2 block w-full min-w-0" className="block min-w-0 rounded-lg border border-hairline bg-paper py-3 pl-3 text-sm outline-none focus:border-deposit">
                 {!mirrors.length && <option value="">Reserve vaults deploying</option>}
                 {mirrors.map((mirror) => <option key={mirror.address} value={mirror.address}>{mirror.mirrorOf}{mirror.address === recommended?.address ? ' · Jev recommends' : ''}</option>)}
-              </select>
+              </Select>
             </label>
             <p className="text-xs leading-relaxed text-secondary">Testnet mirror · {mirrors.find((mirror) => mirror.address === reserve)?.mirrorOf ?? 'No reserve available'}. Yield is simulated; wallet transactions are real.</p>
             {pools.isError && <p className="text-xs text-secondary">Jev recommendations are unavailable. Choose a reserve manually.</p>}

@@ -6,6 +6,7 @@ import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { abis } from '@/shared/contracts';
 import { UNDEPLOYED } from '@/shared/networks';
 import { TxButton } from '@/components/tx/TxButton';
+import { Select } from '@/components/ui/Select';
 import { useNetwork } from '@/components/network/NetworkProvider';
 
 export const FRESHNESS_MINUTES = [5, 10, 30, 60] as const;
@@ -86,18 +87,19 @@ export function ProtectStep({ vault, onDone, initial, liveExit }: ProtectStepPro
       <label htmlFor={`fresh-${vault}`} className="mt-3 block text-[11.5px] text-secondary">
         Only act on verdicts newer than
       </label>
-      <select
+      <Select
         id={`fresh-${vault}`}
         value={minutes}
         onChange={(e) => setMinutes(Number(e.target.value))}
-        className="mono mt-1 w-full rounded-lg border border-hairline bg-white px-3 py-2 text-[13px]"
+        wrapperClassName="mt-1 block w-full"
+        className="mono rounded-lg border border-hairline bg-white py-2 pl-3 text-[13px]"
       >
         {FRESHNESS_MINUTES.map((m) => (
           <option key={m} value={m}>
             {m} min
           </option>
         ))}
-      </select>
+      </Select>
       <div className="mt-3 space-y-3">
         <TxButton
           label="1 · Approve shares to Guardian"
