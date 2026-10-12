@@ -20,4 +20,11 @@ describe('nav per network', () => {
     expect(labels(siteNav(NETWORKS.testnet.features))).not.toContain('Pulse');
     expect(labels(visibleNav(siteNav(NETWORKS.mainnet.features)))).not.toContain('Launch');
   });
+  test('Docs is in the app and site nav on both networks', () => {
+    for (const net of [NETWORKS.testnet, NETWORKS.mainnet]) {
+      const docs = visibleNav(appNav(net.features)).find((n) => n.label === 'Docs');
+      expect(docs?.href).toBe('/app/docs');
+      expect(labels(visibleNav(siteNav(net.features)))).toContain('Docs');
+    }
+  });
 });

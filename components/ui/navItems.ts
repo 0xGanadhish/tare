@@ -18,6 +18,7 @@ export function appNav(features: Features): NavItem[] {
     { label: 'Watch', href: '/app/watch' },
     { label: 'Ledger', href: '/app/ledger' },
     { label: 'Launch', href: '/app/launch', hidden: !features.launch },
+    { label: 'Docs', href: '/app/docs' },
   ];
 }
 
