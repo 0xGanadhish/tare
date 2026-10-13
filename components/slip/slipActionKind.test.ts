@@ -10,7 +10,12 @@ describe('slipAction', () => {
   });
   test('slip offers no deposit for a pool with no vault on the current network', () => {
     expect(slipAction('testnet', 'no-such-pool')).toEqual({ kind: 'open' });
-    // Mainnet never offers the testnet mirrors.
-    expect(slipAction('mainnet', mirrored.poolId!)).toEqual({ kind: 'open' });
+  });
+  test('mainnet never offers a testnet mirror, only the real vault for the same pool', () => {
+    for (const m of NETWORKS.testnet.vaults.filter((v) => v.poolId)) {
+      const real = NETWORKS.mainnet.vaults.find((v) => v.poolId === m.poolId);
+      expect(slipAction('mainnet', m.poolId!)).toEqual(real ? { kind: 'deposit', vault: real } : { kind: 'open' });
+      expect(real?.address).not.toBe(m.address);
+    }
   });
 });

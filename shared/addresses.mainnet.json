@@ -1,6 +1,8 @@
 {
-  "mockUsdc": "0xd535a4068265b383976d92718e3E650b5183b6Ab",
+  "deployBlockV2": 112966980,
   "guardian": "0x0F22A6b6E5FB8bda0e85e5034DEaC069c8d5e8DF",
+  "guardianV2": "0x2C78895d94f9A61e569eF679838108cb2Ec50f23",
+  "launchFactory": "0xf7FECFF40b2851bc205A5F234Fd6EcA379a867A1",
   "mirrors": [
     {
       "address": "0x7504b078d1F2b90fb9fcAf3d22753311013EA0aC",
@@ -23,5 +25,23 @@
       "poolId": "e259a7bc-d2b0-41e5-b12d-a3c7b984560c"
     }
   ],
-  "launchFactory": "0xf7FECFF40b2851bc205A5F234Fd6EcA379a867A1"
+  "mockUsdc": "0xd535a4068265b383976d92718e3E650b5183b6Ab",
+  "oracle": "0x6c1eCe33Cc745d57Ec1A6EDB64573A90863e96D8",
+  "usdc": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+  "vaults": [
+    {
+      "address": "0xE1BcA19baA63894D374578320551633320436523",
+      "name": "Clearstar Earn USDC",
+      "poolId": "d711af54-e736-470f-8a22-431a23de76df",
+      "protocol": "euler",
+      "adapter": "0x738f70aa6f4a6e2882641a42a3C19a44D7D04FB3"
+    },
+    {
+      "address": "0x80017bF0f793EBbE9679Cd61ff0e395B62CAbB59",
+      "name": "August USDC V2",
+      "poolId": "0b033747-3a22-486b-a600-9958b878bef7",
+      "protocol": "morpho",
+      "adapter": "0xF766CF9770A0ECb7808d4Fb19816742A0E0Bc4a7"
+    }
+  ]
 }

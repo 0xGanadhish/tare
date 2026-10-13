@@ -81,7 +81,15 @@ Left out on purpose: Hyperithm USDC Apex (3.7% withdrawable, under the 5% floor,
 
 ### Monad Mainnet (chain 143)
 
-<!-- mainnet-v2: filled in from shared/addresses.mainnet.json at deploy -->
+Source verified on Sourcify (shown on MonadVision). Deployed 13 Oct 2026 at block 112,967,056 ([oracle creation tx](https://monadvision.com/tx/0x5108b95d778394184ba29d991096208dd0d6fa16b4f6ceaa5f71a7e170a2a06f)).
+
+| Contract | Address |
+|---|---|
+| TareRiskOracle (24 h grading window + 1 h sampling) | [`0x6c1eCe33Cc745d57Ec1A6EDB64573A90863e96D8`](https://monadvision.com/address/0x6c1eCe33Cc745d57Ec1A6EDB64573A90863e96D8) |
+| GuardianV2 | [`0x2C78895d94f9A61e569eF679838108cb2Ec50f23`](https://monadvision.com/address/0x2C78895d94f9A61e569eF679838108cb2Ec50f23) |
+| EulerEarnAdapter (Clearstar) | [`0x738f70aa6f4a6e2882641a42a3C19a44D7D04FB3`](https://monadvision.com/address/0x738f70aa6f4a6e2882641a42a3C19a44D7D04FB3) |
+| MorphoV2Adapter (August) | [`0xF766CF9770A0ECb7808d4Fb19816742A0E0Bc4a7`](https://monadvision.com/address/0xF766CF9770A0ECb7808d4Fb19816742A0E0Bc4a7) |
+| USDC (Circle) | `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` |
 
 ### Monad Testnet (chain 10143), source verified
 
