@@ -6,6 +6,8 @@ Tare watches yield vaults on Monad. Jev (TypeSafe's System One model) judges eac
 
 Tare is a risk primitive: one oracle, one keeperless exit contract and one public scorecard that wallets, vault curators and treasuries can read or build on.
 
+In trading terms, Guardian is a **stop-loss order for yield**: you set the rule once (how sure the warning must be, how fresh), and the order fires on a risk signal instead of a price, executed by anyone, settled to you in one Monad block. And Tare answers the question every parametric product has to face, *who is accountable when the oracle is wrong?*, with a public grading window and a scorecard it can't edit.
+
 ![Tare landing page: every Monad pool plotted by APY and TVL, colored by Jev's verdict](docs/screenshots/landing.jpg)
 
 ## Live
@@ -111,6 +113,8 @@ The v1 Guardian (`0x0F22A6b6E5FB8bda0e85e5034DEaC069c8d5e8DF`) could only be cal
 - **Honest limits.** The attester is a single key, so a compromised attester could post a fresh EXIT and trigger exits. Those exits still pay only the owner and only for users who opted in at that confidence. The Docs tab lists the rest.
 
 ## Use Tare in your own product
+
+The full reference, with signatures, grading rules, API responses and GraphQL queries, is in [docs/developers.md](docs/developers.md).
 
 - **Read the oracle.** `latest(vault)` gives the newest verdict id; `getPost(id)` gives verdict, confidence, risk and `stateHash`; `getResolution(id)` gives the grade. Events: `VerdictPosted`, `VerdictSampled`, `VerdictResolved`.
 - **Read the API.** `GET /v1/vaults/{network}/{vault}/latest`, `/v1/verdicts`, `/v1/ledger/score`, `/v1/pools`. Read-only, no key.
