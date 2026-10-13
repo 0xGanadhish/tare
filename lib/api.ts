@@ -6,13 +6,7 @@ import { BackendUnavailable, serverBackend } from './backend';
 
 /** Market data: fixtures when offline or DATA_SOURCE=fixtures, else the backend (BACKEND_URL; throws BackendUnavailable when it can't answer), else the local worker cache. */
 export async function readMarket(): Promise<{ pools: Pool[]; verdicts: Record<string, Verdict>; asOf: string }> {
-  if (process.env.OFFLINE === '1') {
-    const dir = process.env.FIXTURES_DIR ?? join(process.cwd(), 'fixtures');
-    const [pools, verdicts] = await Promise.all([
-      readFile(join(dir, 'pools.json'), 'utf8'), readFile(join(dir, 'verdicts.json'), 'utf8'),
-    ]);
-    return { ...JSON.parse(pools), verdicts: JSON.parse(verdicts) };
-  }
+  if (process.env.OFFLINE === '1') return readFixtureMarket();
   const backend = process.env.DATA_SOURCE === 'fixtures' ? null : serverBackend();
   if (backend) {
     // With a backend configured, its answer is the only live source: falling back here could show fixture pools as live.
@@ -22,6 +16,23 @@ export async function readMarket(): Promise<{ pools: Pool[]; verdicts: Record<st
   }
   const [market, verdicts] = await Promise.all([readPools(), readVerdicts()]);
   return { ...market, verdicts };
+}
+
+async function readFixtureMarket(): Promise<{ pools: Pool[]; verdicts: Record<string, Verdict>; asOf: string }> {
+  const dir = process.env.FIXTURES_DIR ?? join(process.cwd(), 'fixtures');
+  const [pools, verdicts] = await Promise.all([
+    readFile(join(dir, 'pools.json'), 'utf8'), readFile(join(dir, 'verdicts.json'), 'utf8'),
+  ]);
+  return { ...JSON.parse(pools), verdicts: JSON.parse(verdicts) };
+}
+
+/** Landing page market: the same live source as Explore; if that fails the page still renders from the fixture snapshot, flagged `live: false`. */
+export async function readLandingMarket(): Promise<{ pools: Pool[]; verdicts: Record<string, Verdict>; asOf: string; live: boolean }> {
+  try {
+    return { ...(await readMarket()), live: true };
+  } catch {
+    return { ...(await readFixtureMarket()), live: false };
+  }
 }
 
 export function isIntent(value: unknown): value is Intent {

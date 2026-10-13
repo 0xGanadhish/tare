@@ -80,3 +80,29 @@ describe('readMarket source order', () => {
     await expect(readMarket()).rejects.toMatchObject({ name: 'BackendUnavailable' }); // resetModules gives a fresh class
   });
 });
+
+describe('readLandingMarket', () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetModules(); });
+
+  test('uses the live backend, the same source as Explore', async () => {
+    vi.stubEnv('DATA_SOURCE', '');
+    vi.stubEnv('OFFLINE', '');
+    vi.stubEnv('BACKEND_URL', 'https://api.example');
+    vi.stubGlobal('fetch', vi.fn(async () => ok({ pools: [{ id: 'p1' }], verdicts: {}, asOf: '2026-10-13T08:00:00Z' })));
+    const { readLandingMarket } = await import('./api');
+    expect(await readLandingMarket()).toEqual({ pools: [{ id: 'p1' }], verdicts: {}, asOf: '2026-10-13T08:00:00Z', live: true });
+  });
+
+  test('backend down: still renders from the fixture snapshot, marked not live', async () => {
+    vi.stubEnv('DATA_SOURCE', '');
+    vi.stubEnv('OFFLINE', '');
+    vi.stubEnv('BACKEND_URL', 'https://api.example');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('down', { status: 503 })));
+    const { readLandingMarket } = await import('./api');
+    const market = await readLandingMarket();
+    expect(market.live).toBe(false);
+    expect(market.pools.length).toBeGreaterThan(0);
+    expect(Object.keys(market.verdicts).length).toBeGreaterThan(0);
+    expect(Number.isNaN(Date.parse(market.asOf))).toBe(false);
+  });
+});
