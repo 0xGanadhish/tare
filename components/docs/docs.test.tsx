@@ -6,8 +6,8 @@ const nav = vi.hoisted(() => ({ notFound: vi.fn(() => { throw new Error('NEXT_NO
 vi.mock('next/navigation', () => ({ notFound: nav.notFound }));
 
 import { DOC_TOPICS } from './topics';
-import { API_ROUTES, CHECK_EVERY, GUARDIAN } from './articles';
-import { ALARM_MS } from '@/backend/src/cadence';
+import { API_ROUTES, CHECK_EVERY, GUARDIAN, RESOLVE_WINDOW, SAMPLE_WINDOW } from './articles';
+import { ALARM_MS, RESOLVE_WINDOW_S, SAMPLE_WINDOW_S } from '@/backend/src/cadence';
 import { FRESHNESS_MINUTES, MAX_CONFIDENCE_PCT, MIN_CONFIDENCE_PCT } from '@/components/advisor/ProtectStep';
 import { PUBLIC_ROUTES } from '@/backend/src/root';
 import DocsHub from '@/app/(app)/app/docs/page';
@@ -84,6 +84,21 @@ describe('/app/docs', () => {
 
   test('check intervals in the docs match the watcher', () => {
     expect(CHECK_EVERY).toEqual({ testnet: `${ALARM_MS.testnet / 1000} seconds`, mainnet: `${ALARM_MS.mainnet / 1000} seconds` });
+  });
+
+  test('Ledger page explains grading on the worst reading', async () => {
+    await topicPage('ledger');
+    const text = document.body.textContent ?? '';
+    expect(text).toMatch(/worst/i);
+    expect(text).toContain('sample');
+    expect(text).toMatch(/flash loan/i);
+  });
+
+  test('grading windows in the docs match the resolver', () => {
+    const hours = (s: number) => `${s / 3600} hour${s === 3600 ? '' : 's'}`;
+    expect(RESOLVE_WINDOW).toEqual({ testnet: hours(RESOLVE_WINDOW_S.testnet), mainnet: hours(RESOLVE_WINDOW_S.mainnet) });
+    expect(SAMPLE_WINDOW).toEqual({ testnet: null, mainnet: hours(SAMPLE_WINDOW_S.mainnet) });
+    expect(SAMPLE_WINDOW_S.testnet).toBe(0);
   });
 
   test('an unknown topic is a 404', async () => {

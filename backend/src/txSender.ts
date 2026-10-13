@@ -4,7 +4,7 @@ import { NETWORKS, type Network } from '../../shared/networks';
 import { viemChainClient, type ChainClient, type Receipt } from './chain';
 import { rpcFor, secretFor, type Env, type KeyRole } from './env';
 
-export type TxKind = 'post' | 'exit' | 'resolve' | 'admin';
+export type TxKind = 'post' | 'exit' | 'sample' | 'resolve' | 'admin';
 export interface SendRequest { to: Address; data: Hex; kind: TxKind }
 /** `pending`: broadcast, but no receipt within the wait. The tx may still land; callers keep the hash and check later. */
 export interface SendResult extends Omit<Receipt, 'status'> { hash: Hex; status: Receipt['status'] | 'pending' }

@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { abis } from '../../shared/contracts';
 import { NETWORKS } from '../../shared/networks';
 import type { Pool, Verdict } from '../../shared/types';
-import { resolveDue, RESOLVE_WINDOW_S, scanPools, type ResolverDeps } from '../src/crons';
+import { resolveDue, RESOLVE_WINDOW_S, SAMPLE_WINDOW_S, scanPools, type ResolverDeps } from '../src/crons';
 import type { SendRequest, SendResult } from '../src/txSender';
 
 const VAULT = '0x7504b078d1f2b90fb9fcaf3d22753311013ea0ac';
 
-async function seedPost(id: number, postedAt: number, resolved = 0) {
-  await env.DB.prepare(`INSERT INTO posts (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at, resolved)
-    VALUES ('testnet', ?, ?, 1, 9000, 4000, '0x', ?, ?)`).bind(id, VAULT, postedAt, resolved).run();
+async function seedPost(id: number, postedAt: number, resolved = 0, network: 'testnet' | 'mainnet' = 'testnet', sampled = 0) {
+  await env.DB.prepare(`INSERT INTO posts (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at, resolved, sampled)
+    VALUES (?, ?, ?, 1, 9000, 4000, '0x', ?, ?, ?)`).bind(network, id, VAULT, postedAt, resolved, sampled).run();
 }
 
 function resolvedLog(id: bigint, adverse: boolean, reasons: number) {
@@ -52,7 +52,7 @@ describe('resolver', () => {
     const result = await resolveDue(env, 'testnet', NOW, deps);
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ to: NETWORKS.testnet.oracle, kind: 'resolve' });
-    expect(result).toEqual({ sent: 1, synced: 0, failed: 0 });
+    expect(result).toEqual({ sampled: 0, sent: 1, synced: 0, failed: 0 });
     expect(await rows()).toEqual([
       { id: 1, resolved: 1, adverse: 1, reasons: 5 },
       { id: 2, resolved: 0, adverse: null, reasons: null },
@@ -63,7 +63,7 @@ describe('resolver', () => {
   it('resolveDue syncs already-resolved posts without sending', async () => {
     await seedPost(1, NOW - RESOLVE_WINDOW_S.testnet - 1);
     const { deps, sent } = resolverDeps({ 1: { resolved: true, adverse: false, reasons: 0 } });
-    expect(await resolveDue(env, 'testnet', NOW, deps)).toEqual({ sent: 0, synced: 1, failed: 0 });
+    expect(await resolveDue(env, 'testnet', NOW, deps)).toEqual({ sampled: 0, sent: 0, synced: 1, failed: 0 });
     expect(sent).toHaveLength(0);
     expect(await rows()).toEqual([{ id: 1, resolved: 1, adverse: 0, reasons: 0 }]);
   });
@@ -74,9 +74,66 @@ describe('resolver', () => {
     let calls = 0;
     const flaky: ResolverDeps = { ...deps, readResolution: async (n, id) => { if (calls++ === 0) throw new Error('rpc'); return deps.readResolution(n, id); } };
     const result = await resolveDue(env, 'testnet', NOW, flaky);
-    expect(result).toEqual({ sent: 19, synced: 0, failed: 1 });
+    expect(result).toEqual({ sampled: 0, sent: 19, synced: 0, failed: 1 });
     const unresolved = (await rows()).filter((r) => r.resolved === 0).map((r) => r.id);
     expect(unresolved).toEqual([1, 21, 22]);
+  });
+});
+
+describe('resolver: sampling (spec §2b)', () => {
+  beforeEach(async () => { await env.DB.exec('DELETE FROM posts;'); });
+  const RW = RESOLVE_WINDOW_S.mainnet;
+  const SW = SAMPLE_WINDOW_S.mainnet;
+  const fn = (r: SendRequest) => decodeFunctionData({ abi: abis.oracle, data: r.data });
+  const sampledRows = async () => (await env.DB.prepare('SELECT id, sampled, resolved FROM posts ORDER BY id').all()).results;
+
+  it('windows match the deploy: mainnet samples for 1 h after 24 h, testnet does not sample', () => {
+    expect(RESOLVE_WINDOW_S).toEqual({ testnet: 3_600, mainnet: 86_400 });
+    expect(SAMPLE_WINDOW_S).toEqual({ testnet: 0, mainnet: 3_600 });
+  });
+
+  it('mainnet: samples a post once its window opens, and resolves only after sampling closes', async () => {
+    await seedPost(1, NOW - RW - 10, 0, 'mainnet'); // sampling open
+    await seedPost(2, NOW - RW - SW - 1, 0, 'mainnet', 1); // sampling closed
+    await seedPost(3, NOW - RW + 60, 0, 'mainnet'); // still in the resolve window
+    const { deps, sent } = resolverDeps();
+    const result = await resolveDue(env, 'mainnet', NOW, deps);
+    expect(sent.map((r) => [r.kind, fn(r).functionName, fn(r).args![0]])).toEqual([['sample', 'sample', 1n], ['resolve', 'resolve', 2n]]);
+    expect(result).toEqual({ sampled: 1, sent: 1, synced: 0, failed: 0 });
+    expect(await sampledRows()).toEqual([
+      { id: 1, sampled: 1, resolved: 0 },
+      { id: 2, sampled: 1, resolved: 1 },
+      { id: 3, sampled: 0, resolved: 0 },
+    ]);
+  });
+
+  it('mainnet: a sampled post is not sampled again', async () => {
+    await seedPost(1, NOW - RW - 10, 0, 'mainnet', 1);
+    const { deps, sent } = resolverDeps();
+    expect(await resolveDue(env, 'mainnet', NOW, deps)).toEqual({ sampled: 0, sent: 0, synced: 0, failed: 0 });
+    expect(sent).toHaveLength(0);
+  });
+
+  it('mainnet: a reverted sample stays unsampled and is retried next minute', async () => {
+    await seedPost(1, NOW - RW - 10, 0, 'mainnet');
+    const { deps } = resolverDeps();
+    const reverting: ResolverDeps = { ...deps, sender: () => ({ send: async () => ({ hash: `0x${'ee'.repeat(32)}`, status: 'reverted', blockNumber: 1n, gasUsed: 1n, logs: [] }) }) };
+    expect(await resolveDue(env, 'mainnet', NOW, reverting)).toEqual({ sampled: 0, sent: 0, synced: 0, failed: 1 });
+    expect(await sampledRows()).toEqual([{ id: 1, sampled: 0, resolved: 0 }]);
+  });
+
+  it('mainnet: a post nobody sampled still resolves after the window (the contract reads once)', async () => {
+    await seedPost(1, NOW - RW - SW - 1, 0, 'mainnet');
+    const { deps, sent } = resolverDeps();
+    expect(await resolveDue(env, 'mainnet', NOW, deps)).toEqual({ sampled: 0, sent: 1, synced: 0, failed: 0 });
+    expect(fn(sent[0]).functionName).toBe('resolve');
+  });
+
+  it('testnet resolves right after its window, without sampling', async () => {
+    await seedPost(1, NOW - RESOLVE_WINDOW_S.testnet - 1);
+    const { deps, sent } = resolverDeps();
+    await resolveDue(env, 'testnet', NOW, deps);
+    expect(sent.map((r) => r.kind)).toEqual(['resolve']);
   });
 });
 

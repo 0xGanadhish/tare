@@ -4,12 +4,12 @@ import { fetchMonadPools } from '../../lib/indexer';
 import { abis } from '../../shared/contracts';
 import { NETWORKS, UNDEPLOYED, type Network } from '../../shared/networks';
 import type { Pool, Verdict } from '../../shared/types';
+import { RESOLVE_WINDOW_S, SAMPLE_WINDOW_S } from './cadence';
 import { rpcFor, type Env } from './env';
 import { safeError } from './errors';
 import { txSender, type Sender } from './txSender';
 
-/** TareRiskOracle.resolveWindow per network (immutable constructor argument, spec §4.1). */
-export const RESOLVE_WINDOW_S: Record<Network, number> = { testnet: 3_600, mainnet: 86_400 };
+export { RESOLVE_WINDOW_S, SAMPLE_WINDOW_S };
 const RESOLVE_BATCH = 20;
 const SCAN_CONCURRENCY = 4;
 
@@ -74,14 +74,38 @@ export function realResolverDeps(env: Env): ResolverDeps {
 }
 
 /**
- * Resolver (plan Task 13): grade every post whose window has ended, oldest first. Anyone may call resolve(),
- * so posts someone else already graded are synced from chain instead of sent again. TVL and liquidity are
- * graded at the moment of the call, which is why this runs every minute (spec amendment, security review 1).
+ * Resolver (plan Task 13, spec §2b): grade every post whose windows have ended, oldest first. Where the network has a
+ * sampling window, it first sends one sample() per post as soon as that window opens: one honest reading caps the
+ * grade, so a flash loan around someone else's sample or resolve can't flatter it. Anyone may call resolve(), so posts
+ * someone else already graded are synced from chain instead of sent again.
  */
-export async function resolveDue(env: Env, network: Network, now: number, deps: ResolverDeps = realResolverDeps(env)): Promise<{ sent: number; synced: number; failed: number }> {
+export async function resolveDue(env: Env, network: Network, now: number, deps: ResolverDeps = realResolverDeps(env)): Promise<{ sampled: number; sent: number; synced: number; failed: number }> {
+  const tally = { sampled: 0, sent: 0, synced: 0, failed: 0 };
+  const opensAfter = RESOLVE_WINDOW_S[network];
+  const closesAfter = opensAfter + SAMPLE_WINDOW_S[network];
+
+  if (SAMPLE_WINDOW_S[network] > 0) {
+    const { results } = await env.DB.prepare(`SELECT id FROM posts WHERE network = ? AND resolved = 0 AND sampled = 0 AND posted_at + ? <= ? AND posted_at + ? > ? ORDER BY posted_at, id LIMIT ?`)
+      .bind(network, opensAfter, now, closesAfter, now, RESOLVE_BATCH).all<{ id: number }>();
+    for (const { id } of results) {
+      try {
+        const receipt = await deps.sender(network).send({
+          to: NETWORKS[network].oracle, kind: 'sample',
+          data: encodeFunctionData({ abi: abis.oracle, functionName: 'sample', args: [BigInt(id)] }),
+        });
+        if (receipt.status !== 'success') throw new Error(`sample reverted (${receipt.hash})`);
+        await env.DB.prepare('UPDATE posts SET sampled = 1 WHERE network = ? AND id = ?').bind(network, id).run();
+        tally.sampled++;
+        console.log(JSON.stringify({ msg: 'verdict_sampled', network, verdictId: id, txHash: receipt.hash }));
+      } catch (err) {
+        tally.failed++;
+        console.error(JSON.stringify({ msg: 'sample_failed', network, verdictId: id, error: safeError(err) }));
+      }
+    }
+  }
+
   const { results } = await env.DB.prepare(`SELECT id FROM posts WHERE network = ? AND resolved = 0 AND posted_at + ? <= ? ORDER BY posted_at, id LIMIT ?`)
-    .bind(network, RESOLVE_WINDOW_S[network], now, RESOLVE_BATCH).all<{ id: number }>();
-  const tally = { sent: 0, synced: 0, failed: 0 };
+    .bind(network, closesAfter, now, RESOLVE_BATCH).all<{ id: number }>();
   const save = (id: number, adverse: boolean, reasons: number) => env.DB.prepare('UPDATE posts SET resolved = 1, adverse = ?, reasons = ? WHERE network = ? AND id = ?')
     .bind(adverse ? 1 : 0, reasons, network, id).run();
   for (const { id } of results) {

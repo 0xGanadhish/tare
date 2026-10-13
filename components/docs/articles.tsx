@@ -20,6 +20,8 @@ const pts = (bps: number) => `${bps / 100} point${bps === 100 ? '' : 's'}`;
 export const GUARDIAN = { minPct: 80, maxPct: 99, defaultPct: 90, freshness: [5, 10, 30, 60], defaultFreshness: 10 } as const;
 /** How long the oracle waits before a verdict can be graded (TareRiskOracle `resolveWindow`). */
 export const RESOLVE_WINDOW: Record<Network, string> = { testnet: '1 hour', mainnet: '24 hours' };
+/** After that, how long anyone can record readings that grading uses (TareRiskOracle `sampleWindow`; none on testnet). */
+export const SAMPLE_WINDOW: Record<Network, string | null> = { testnet: null, mainnet: '1 hour' };
 /** How often each vault is checked (backend `ALARM_MS`). */
 export const CHECK_EVERY: Record<Network, string> = { testnet: '15 seconds', mainnet: '30 seconds' };
 /** Mainnet vaults Tare covers: the live config once deployed, else the vaults the deploy will register. */
@@ -406,14 +408,21 @@ function Ledger() {
       </Section>
       <Section id="graded" title="How a verdict is graded">
         <p>
-          When the verdict is posted, the oracle also writes down the vault&apos;s share price, size and cash on hand. After {RESOLVE_WINDOW.testnet} on testnet or{' '}
-          {RESOLVE_WINDOW.mainnet} on mainnet, <Strong>anyone</Strong> can call <Code>resolve</Code>, and the contract grades it. It is <Strong>adverse</Strong> if any of these happened:
+          When the verdict is posted, the oracle also writes down the vault&apos;s share price, size and cash on hand. On mainnet, {RESOLVE_WINDOW.mainnet} later a{' '}
+          {SAMPLE_WINDOW.mainnet} grading window opens. During it, <Strong>anyone</Strong> can call <Code>sample</Code>, and the contract keeps the worst share price,
+          size and cash it sees. When the window closes, anyone can call <Code>resolve</Code>, and the contract grades those worst readings. On testnet,{' '}
+          <Code>resolve</Code> reads the vault once, after {RESOLVE_WINDOW.testnet}. It is <Strong>adverse</Strong> if any of these happened:
         </p>
         <Checklist
           mark="!"
           items={['The share price fell more than 0.5%.', 'The vault’s total money fell more than 20%.', 'Cash on hand is below 5% of the vault (where Tare can read it).', 'The vault could not be read at all.']}
         />
         <p>Otherwise it is <Strong>clear</Strong>. Grading doesn&apos;t depend on Tare: the rules are in the contract.</p>
+        <p>
+          A reading can only make a grade harsher. Someone could borrow millions for a single transaction (a flash loan) to make a vault look healthy for one
+          reading, but the contract keeps the worst one, so one honest sample is enough. Tare&apos;s backend samples every verdict as soon as its window opens,
+          and anyone else can too.
+        </p>
       </Section>
       <Section id="score" title="The scoreboard">
         <Terms
@@ -426,8 +435,8 @@ function Ledger() {
           ]}
         />
         <Callout title="Honest limits">
-          Grading compares the start and end of the window only, so a crunch that recovers in between is not counted. The size and cash checks read one moment, so Tare
-          resolves each verdict as soon as its window ends. Drills, posted by hand to test exits, are labelled and left out of the score.
+          Grading compares the moment of posting with the grading window, so a crunch that recovers before then is not counted. Testnet reads one moment, and its
+          mirror vaults are run by the operator, so its record is practice. Drills, posted by hand to test exits, are labelled and left out of the score.
         </Callout>
       </Section>
     </>
@@ -461,7 +470,8 @@ function Networks() {
             ['Vaults', 'Mirror vaults that copy real vaults’ APY', 'Approved real vaults'],
             ['Deposit cap in the app', 'None', `$${MAINNET_SOFT_CAP_USD.toLocaleString('en-US')} per wallet`],
             ['Each vault checked every', CHECK_EVERY.testnet, CHECK_EVERY.mainnet],
-            ['Verdict graded after', RESOLVE_WINDOW.testnet, RESOLVE_WINDOW.mainnet],
+            ['Verdict graded after', RESOLVE_WINDOW.testnet, `${RESOLVE_WINDOW.mainnet}, then a ${SAMPLE_WINDOW.mainnet} window`],
+            ['Graded on', 'One reading', 'The worst reading in that window'],
             ['Faucet', yes(t.features.faucet), yes(m.features.faucet)],
             ['Demo controls', yes(t.features.demoControls), yes(m.features.demoControls)],
             ['Launch', yes(t.features.launch), yes(m.features.launch)],
@@ -557,7 +567,7 @@ function Risks() {
             ['Exits need a fresh verdict', 'If Jev, the network or Tare’s backend is down, no new verdict is posted, so Guardian can’t act. Exit now still works.'],
             ['Smart contract risk', 'Tare’s contracts are tested and were security-reviewed during the build. Bugs are still possible.'],
             ['Key risk', 'If the key that posts verdicts were stolen, the worst case is an early exit, back to your own wallet. It can be rotated.'],
-            ['Grading limits', 'Verdicts are graded on the start and end of a window, so short crunches in between are missed.'],
+            ['Grading limits', 'Verdicts are graded on the moment of posting and the worst reading in the grading window, so short crunches in between are missed.'],
             ['Mainnet is real money', `Start small. The app caps deposits at $${MAINNET_SOFT_CAP_USD.toLocaleString('en-US')} per wallet.`],
           ]}
         />
