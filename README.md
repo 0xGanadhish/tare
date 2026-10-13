@@ -22,7 +22,7 @@ In trading terms, Guardian is a **stop-loss order for yield**: you set the rule 
 
 ### For judges: how to check it
 
-1. **Mainnet, no wallet needed.** Open the app, switch to **Mainnet**, open **Ledger**. Every verdict links to its oracle transaction, the state document Jev was shown, and its grade once the window closes. The same data is at `https://api.tarefi.xyz/v1/verdicts?network=mainnet` and `/v1/ledger/score?network=mainnet`.
+1. **Mainnet, no wallet needed.** Open the **[mainnet Ledger](https://tarefi.xyz/app/ledger?network=mainnet)**. Every verdict links to its oracle transaction, the state document Jev was shown, and its grade once the window closes. Mainnet verdicts are graded 24 hours after posting, after a 1-hour sampling window, so the first ones (posted 13 Oct, 11:55 IST) are graded from **14 Oct, about 13:00 IST**, and new grades land every day after that. The page reads the chain live, so it fills in on its own. The same data is at [`/v1/verdicts?network=mainnet`](https://api.tarefi.xyz/v1/verdicts?network=mainnet) and [`/v1/ledger/score?network=mainnet`](https://api.tarefi.xyz/v1/ledger/score?network=mainnet). To see a full grading cycle right away, switch the Ledger to **Testnet**, where the window is 1 hour.
 2. **Mainnet, with a wallet.** Deposit a few USDC into Clearstar or August through **Advisor**, and turn on Guardian in the protect step that follows. Your exit rule is stored in `GuardianV2`, shows up in **Watch**, and can be turned off at any time.
 3. **Testnet stress demo.** Switch to **Testnet**, click **Get test USDC**, deposit into a mirror vault and turn Guardian on. The mirror vaults copy a real vault's APY and let an operator push utilization up, so you can watch Jev post an EXIT verdict and the Guardian exit land in seconds. The demo controls need the operator's `ADMIN_TOKEN`, so the demo video shows a full stress run.
 4. **Read the code paths that matter:** [`TareRiskOracle.sol`](contracts/src/TareRiskOracle.sol), [`GuardianV2.sol`](contracts/src/GuardianV2.sol), the adapters in [`contracts/src/adapters/`](contracts/src/adapters), and the backend's [`crons.ts`](backend/src/crons.ts) (sampling and grading) and [`watcher.ts`](backend/src/watcher.ts) (verdicts).
@@ -186,7 +186,7 @@ cd contracts && forge test         # unit and fuzz (114), plus 7 mainnet fork te
 
 - **3rd place at Monad Blitz Pune V3** (10 Oct 2026), built solo in a day. That build is the foundation listed below.
 - The testnet ledger has been posting and grading verdicts around the clock since 11 Oct, from Cloudflare rather than a laptop.
-- Mainnet: two real USDC vaults (about $14M TVL) watched, with every verdict public and graded.
+- Mainnet since 13 Oct: two real USDC vaults (about $14M TVL) watched, every verdict posted onchain, and every one graded 24 hours later on the [mainnet Ledger](https://tarefi.xyz/app/ledger?network=mainnet).
 
 ## Business model
 

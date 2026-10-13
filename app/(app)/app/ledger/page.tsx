@@ -10,6 +10,7 @@ import { Scoreboard } from '@/components/ledger/Scoreboard';
 import { verdictLabel } from '@/components/ledger/format';
 import { useNetwork } from '@/components/network/NetworkProvider';
 import { Select } from '@/components/ui/Select';
+import { Method } from '@/components/ledger/Method';
 
 type Page = { verdicts: LedgerVerdict[]; cursor: string | null; source: 'fixtures' | 'backend' };
 const STATE_BASE = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || null;
@@ -109,37 +110,5 @@ export default function LedgerPage() {
 
       <Method />
     </div>
-  );
-}
-
-function Method() {
-  return (
-    <section aria-labelledby="method" className="mt-10 max-w-[720px] text-[13px] leading-relaxed text-secondary">
-      <h2 id="method" className="text-[17px] font-semibold text-ink">Method</h2>
-      <p className="mt-2">
-        When Tare posts a verdict, the oracle records the vault&apos;s share price, total assets and available liquidity. After the window
-        (1 hour on testnet, 24 hours on mainnet) the verdict is graded <strong className="text-ink">adverse</strong> if any of these happened:
-      </p>
-      <ul className="mt-2 list-disc space-y-1 pl-5">
-        <li>the share price fell more than 0.5% (price drop)</li>
-        <li>total assets fell more than 20% (TVL drop)</li>
-        <li>available liquidity is below 5% of total assets, for vaults with a liquidity adapter (liquidity)</li>
-        <li>the vault could not be read at all (vault unreadable)</li>
-      </ul>
-      <p className="mt-2">
-        Otherwise it is <strong className="text-ink">clear</strong>. Anyone can call <code className="mono text-ink">resolve</code> on the oracle once the
-        window ends, so grading does not depend on Tare.
-      </p>
-      <p className="mt-2">
-        A verdict is right when an EXIT is followed by an adverse outcome, or a HOLD or MOVE by none. The Brier score compares each verdict&apos;s
-        withdrawal-risk forecast with what happened (0 is perfect, lower is better). Drills, posted by hand to test exits, are labelled and left out of the score. Fewer than 30
-        graded verdicts is early data.
-      </p>
-      <p className="mt-2">
-        Limits: grading compares the start and the end of the window only, so a crunch that recovers inside the window is not counted. The TVL and
-        liquidity grades read a single moment when <code className="mono text-ink">resolve</code> runs, so they are point-in-time; Tare resolves each
-        verdict as soon as its window ends. The share-price grade is the robust one.
-      </p>
-    </section>
   );
 }

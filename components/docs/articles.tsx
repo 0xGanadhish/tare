@@ -18,10 +18,8 @@ const pts = (bps: number) => `${bps / 100} point${bps === 100 ? '' : 's'}`;
 
 /** Guardian rule bounds: ProtectStep's slider and freshness choices (GuardianV2 accepts 80–99%, 1–60 min). */
 export const GUARDIAN = { minPct: 80, maxPct: 99, defaultPct: 90, freshness: [5, 10, 30, 60], defaultFreshness: 10 } as const;
-/** How long the oracle waits before a verdict can be graded (TareRiskOracle `resolveWindow`). */
-export const RESOLVE_WINDOW: Record<Network, string> = { testnet: '1 hour', mainnet: '24 hours' };
-/** After that, how long anyone can record readings that grading uses (TareRiskOracle `sampleWindow`; none on testnet). */
-export const SAMPLE_WINDOW: Record<Network, string | null> = { testnet: null, mainnet: '1 hour' };
+import { RESOLVE_WINDOW, SAMPLE_WINDOW } from './windows';
+export { RESOLVE_WINDOW, SAMPLE_WINDOW };
 /** How often each vault is checked (backend `ALARM_MS`). */
 export const CHECK_EVERY: Record<Network, string> = { testnet: '15 seconds', mainnet: '30 seconds' };
 /** Mainnet vaults Tare covers: the live config once deployed, else the vaults the deploy will register. */
