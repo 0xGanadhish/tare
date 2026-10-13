@@ -1,7 +1,7 @@
 import { createPublicClient, http, parseAbiItem, type Address } from 'viem';
 import type { Flows } from '../../lib/judge/state';
 import { NETWORKS, type Network } from '../../shared/networks';
-import { rpcFor, type Env } from './env';
+import { publicRpc, type Env } from './env';
 import { safeError } from './errors';
 import type { Protection } from './watcher';
 
@@ -25,7 +25,8 @@ const enabledEvent = parseAbiItem('event Enabled(address indexed owner, address 
 const disabledEvent = parseAbiItem('event Disabled(address indexed owner, address indexed vault)');
 
 export function realEnvioDeps(env: Env): EnvioDeps {
-  const client = (network: Network) => createPublicClient({ chain: NETWORKS[network].chain, transport: http(rpcFor(env, network), { retryCount: 2 }) });
+  // The public RPC, whose 100-block getLogs cap CHUNK is sized for (Alchemy's Monad mainnet endpoint rejects these calls).
+  const client = (network: Network) => createPublicClient({ chain: NETWORKS[network].chain, transport: http(publicRpc(network), { retryCount: 2 }) });
   return {
     url: env.ENVIO_GRAPHQL_URL ?? null,
     fetch: (input, init) => fetch(input, init),

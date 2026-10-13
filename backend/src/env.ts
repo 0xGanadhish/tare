@@ -36,6 +36,9 @@ export function secretFor(env: Env, role: KeyRole, network: Network): Hex {
   return value as Hex;
 }
 
+/** The public Monad RPC. Guardian log reads use it: Alchemy's Monad mainnet endpoint rejects those getLogs calls. */
+export const publicRpc = (network: Network): string => PUBLIC_RPC[network];
+
 /** Alchemy when configured, else the public Monad RPC. */
 export function rpcFor(env: Env, network: Network): string {
   return (network === 'testnet' ? env.ALCHEMY_URL_TESTNET : env.ALCHEMY_URL_MAINNET) || PUBLIC_RPC[network];

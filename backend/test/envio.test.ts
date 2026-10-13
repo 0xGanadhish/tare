@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { readFlows, readProtections, syncProtections, type EnvioDeps, type GuardianLog } from '../src/envio';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFlows, readProtections, realEnvioDeps, syncProtections, type EnvioDeps, type GuardianLog } from '../src/envio';
+import type { Env } from '../src/env';
 
 import { NETWORKS } from '../../shared/networks';
 
@@ -156,5 +157,23 @@ describe('syncProtections', () => {
 
   it('syncProtections: an RPC failure is logged, never thrown', async () => {
     await expect(syncProtections(env.DB, deps({ getBlockNumber: async () => { throw new Error('rpc down'); } }), 'testnet', { maxChunks: 4n, minLag: 200n })).resolves.toBeUndefined();
+  });
+});
+
+describe('realEnvioDeps', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('realEnvioDeps: Guardian log reads go to the public RPC, even when Alchemy is set (Alchemy rejects them)', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      urls.push(String(input instanceof Request ? input.url : input));
+      const { id, method } = JSON.parse(String(init?.body));
+      return Response.json({ jsonrpc: '2.0', id, result: method === 'eth_blockNumber' ? '0x10' : [] });
+    });
+    const real = realEnvioDeps({ ALCHEMY_URL_MAINNET: 'https://alchemy.test/v2/key' } as unknown as Env);
+    expect(await real.getBlockNumber('mainnet')).toBe(16n);
+    expect(await real.getGuardianLogs('mainnet', 1n, 2n)).toEqual([]);
+    expect(urls.length).toBeGreaterThanOrEqual(2);
+    expect(urls.every((u) => u.startsWith('https://rpc.monad.xyz'))).toBe(true);
   });
 });
