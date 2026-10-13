@@ -238,4 +238,37 @@ contract ForkTest is Test {
             assertEq(after_.pps, honest.pps, "worst share price unchanged");
         }
     }
+
+    /// The attack ordering on a real vault: the flash-boosted sample lands first, the honest one second.
+    function testFork_flashSampleFirst_honestSampleWins() public {
+        (address[] memory vaults, string[] memory kinds) = _vaults();
+        for (uint256 i = 0; i < vaults.length; i++) {
+            if (keccak256(bytes(kinds[i])) != keccak256("morpho-v2")) continue;
+            address vault = vaults[i];
+            address liqAdapter = IMorphoVaultV2(vault).liquidityAdapter();
+            if (liqAdapter == address(0)) continue;
+
+            TareRiskOracle oracle = new TareRiskOracle(owner, attester, 86_400, 3_600);
+            AdapterKinds.Cache memory cache;
+            address adapter = AdapterKinds.adapterFor(kinds[i], cache);
+            vm.prank(owner);
+            oracle.registerVault(vault, adapter);
+            vm.prank(attester);
+            uint256 id = oracle.post(vault, TareRiskOracle.Verdict.HOLD, 9000, 1000, keccak256("fork"));
+            vm.warp(block.timestamp + 86_400);
+
+            (, uint256 assetsNow, uint256 liqNow) = oracle.metricsOf(vault);
+            uint256 honestBps = liqNow * 10_000 / assetsNow;
+
+            MarketParams memory mp = abi.decode(IMorphoVaultV2(vault).liquidityData(), (MarketParams));
+            IMorphoFlash morpho = IMorphoFlash(IMorphoMarketAdapter(liqAdapter).morpho());
+            FlashSampler attacker = new FlashSampler(oracle, morpho, IERC20(USDC), mp);
+            deal(USDC, address(attacker), 1e6);
+            attacker.boostedSample(id, 5_000_000e6);
+            assertGt(oracle.getSample(id).liquidityBps, honestBps, "the flash sample read flattered liquidity");
+
+            oracle.sample(id);
+            assertEq(oracle.getSample(id).liquidityBps, honestBps, "the honest reading replaced it");
+        }
+    }
 }

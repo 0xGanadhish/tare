@@ -200,4 +200,50 @@ contract OracleSampleTest is Test {
         _toResolve();
         assertFalse(oracle.resolve(id));
     }
+
+    /// The attack ordering: a flattering reading lands first (an attacker sampling as the window opens), then an
+    /// honest one. The grade must follow the honest, worse reading.
+    function test_betterThenWorse_liquidity() public {
+        uint256 id = _post(address(vault));
+        _toSampling();
+        vm.prank(admin);
+        vault.setStats(0, 1000);
+        oracle.sample(id);
+        vm.prank(admin);
+        vault.setStats(0, 9600);
+        oracle.sample(id);
+        assertEq(oracle.getSample(id).liquidityBps, 400);
+        _toResolve();
+        assertEq(oracle.getResolution(id).reasons, 0);
+        assertTrue(oracle.resolve(id));
+        assertEq(oracle.getResolution(id).reasons, oracle.REASON_LIQ());
+    }
+
+    function test_betterThenWorse_assets() public {
+        uint256 id = _post(address(vault));
+        _toSampling();
+        vm.prank(admin);
+        vault.setStats(0, 0); // let the withdrawals below through
+        vm.prank(user);
+        vault.deposit(10_000e6, user);
+        oracle.sample(id);
+        vm.prank(user);
+        vault.withdraw(20_000e6, user, user);
+        oracle.sample(id);
+        assertEq(oracle.getSample(id).assets, 30_000e6);
+        _toResolve();
+        assertTrue(oracle.resolve(id));
+        assertEq(oracle.getResolution(id).reasons & oracle.REASON_TVL(), oracle.REASON_TVL());
+    }
+
+    function test_betterThenWorse_sharePrice() public {
+        uint256 id = _post(address(lossy));
+        _toSampling();
+        oracle.sample(id);
+        lossy.lose(400e6);
+        oracle.sample(id);
+        _toResolve();
+        assertTrue(oracle.resolve(id));
+        assertEq(oracle.getResolution(id).reasons, oracle.REASON_PPS());
+    }
 }
