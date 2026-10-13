@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { readPools, readVerdicts } from '@/shared/cache';
+import { readLandingMarket } from '@/lib/api';
 import { ApyGapBars } from '@/components/pulse/ApyGapBars';
 import { AssetClassBars } from '@/components/pulse/AssetClassBars';
 import { KpiTiles } from '@/components/pulse/KpiTiles';
@@ -11,7 +11,8 @@ export const metadata: Metadata = { title: 'Pulse · Tare' };
 export const dynamic = 'force-dynamic';
 
 export default async function PulsePage() {
-  const [{ pools, asOf }, verdicts] = await Promise.all([readPools(), readVerdicts()]);
+  // Same live source as Explore and the landing page (the bundled cache is the Blitz-day snapshot).
+  const { pools, verdicts, asOf } = await readLandingMarket();
   const stats = pulseStats(pools, verdicts);
   const context: Record<string, MoverContext> = {};
   for (const m of stats.movers) {
