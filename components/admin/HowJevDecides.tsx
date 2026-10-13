@@ -1,11 +1,8 @@
-import {
-  ALERT_CONFIDENCE,
-  AUTO_EXIT_CONFIDENCE,
-  FALLBACK_UTIL_BPS,
-  REJUDGE_APY_BPS,
-  REJUDGE_UTIL_BPS,
-} from '@/lib/judge/gating';
+import { ALERT_CONFIDENCE, FALLBACK_UTIL_BPS, REJUDGE_APY_BPS, REJUDGE_UTIL_BPS } from '@/lib/judge/gating';
 import { VERDICT_RULES as R } from '@/lib/judge/combine';
+import { MAX_CONFIDENCE_PCT, MIN_CONFIDENCE_PCT } from '@/components/advisor/ProtectStep';
+import { OUTFLOW_REJUDGE_PCT } from '@/backend/src/decide';
+import { ALARM_MS, RESOLVE_WINDOW_S } from '@/backend/src/cadence';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const pts = (bps: number) => `${bps / 100} point${bps === 100 ? '' : 's'}`;
@@ -18,7 +15,7 @@ export function HowJevDecides() {
         <h2 className="text-[18px] font-semibold tracking-[-0.02em]">What happens when you press Apply</h2>
         <ol className="mt-4 space-y-3 text-[13.5px] leading-relaxed text-secondary">
           <Step n={1}>The operator signs <span className="mono text-ink">setStats</span> on Monad testnet. The mirror vault now reports the new APY and utilization, the same signal a real vault gives when it gets into trouble.</Step>
-          <Step n={2}>The worker sees it within about a second. If APY moved more than {pts(REJUDGE_APY_BPS)} or utilization more than {pts(REJUDGE_UTIL_BPS)}, it asks Jev again.</Step>
+          <Step n={2}>Tare&apos;s watcher reads each testnet vault every {ALARM_MS.testnet / 1000} seconds. If APY moved more than {pts(REJUDGE_APY_BPS)}, utilization more than {pts(REJUDGE_UTIL_BPS)}, or more than {OUTFLOW_REJUDGE_PCT}% of the vault left in the last hour, it asks Jev again.</Step>
           <Step n={3}>
             Jev answers three questions about each position, and says how sure it is of each:
             <ul className="mt-1.5 list-disc space-y-1 pl-5">
@@ -28,14 +25,15 @@ export function HowJevDecides() {
             </ul>
           </Step>
           <Step n={4}>
-            Fixed rules turn the answer into action:
+            The verdict is posted onchain to Tare&apos;s risk oracle, with its confidence and a hash of exactly what Jev saw. Then fixed rules act on it:
             <ul className="mt-1.5 list-disc space-y-1 pl-5">
-              <li><b className="font-medium text-ink">Exit, at least {pct(AUTO_EXIT_CONFIDENCE)} sure, autopilot on:</b> the Guardian withdraws for you. No signature needed, and funds can only go back to your wallet.</li>
-              <li><b className="font-medium text-ink">Exit, {pct(ALERT_CONFIDENCE)}–{pct(AUTO_EXIT_CONFIDENCE)} sure:</b> an alert with a one-click Exit. You decide.</li>
-              <li><b className="font-medium text-ink">Under {pct(ALERT_CONFIDENCE)} sure:</b> logged on Watch, nothing else.</li>
-              <li><b className="font-medium text-ink">Jev unreachable:</b> never exits on its own; alerts if utilization passes {FALLBACK_UTIL_BPS / 100}%.</li>
+              <li><b className="font-medium text-ink">Exit, at least as sure as your Guardian rule</b> (you pick {MIN_CONFIDENCE_PCT}–{MAX_CONFIDENCE_PCT}%, and how fresh the verdict must be): anyone can trigger your exit, and Tare does it for you. The Guardian contract checks your rule itself, and funds can only go back to your wallet.</li>
+              <li><b className="font-medium text-ink">Exit, {pct(ALERT_CONFIDENCE)} or more but below your rule</b> (or Guardian off): an alert with a one-click Exit. You decide.</li>
+              <li><b className="font-medium text-ink">Hold, or under {pct(ALERT_CONFIDENCE)} sure:</b> logged on Watch, nothing else.</li>
+              <li><b className="font-medium text-ink">Jev unreachable:</b> no verdict is posted, so nothing exits; alerts if utilization passes {FALLBACK_UTIL_BPS / 100}%.</li>
             </ul>
           </Step>
+          <Step n={5}>About {RESOLVE_WINDOW_S.testnet / 3600} hour later on testnet ({RESOLVE_WINDOW_S.mainnet / 3600} hours on mainnet), anyone can grade the verdict onchain against what the vault actually did. The result lands on the Ledger.</Step>
         </ol>
         <p className="mt-5 text-[13px] text-muted">Open <a href="/app/watch" className="text-ink underline decoration-hairline underline-offset-4">Watch</a> in another tab to see each step arrive.</p>
       </div>
@@ -59,7 +57,7 @@ export function HowJevDecides() {
         <div>
           <h2 className="text-[18px] font-semibold tracking-[-0.02em]">Who is Jev</h2>
           <p className="mt-4 text-[13.5px] leading-relaxed text-secondary">
-            Jev is TypeSafe&apos;s System One model. Tare sends it a plain-text description of a pool or position and a fixed set of questions; it returns answers with probabilities. Jev never holds keys: the rules above decide what happens, and every automatic withdrawal goes through the Guardian contract.
+            Jev is TypeSafe&apos;s System One model. Tare sends it a plain-text description of a pool or position and a fixed set of questions; it returns answers with probabilities. Jev never holds keys: the rules above decide what happens, and every exit goes through the Guardian contract, under the rule you set.
           </p>
         </div>
       </div>
