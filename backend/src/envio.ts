@@ -54,6 +54,20 @@ async function query<T>(deps: EnvioDeps, gql: string, variables: Record<string, 
 
 const usd = (assets: bigint) => Number(assets) / 10 ** USDC_DECIMALS;
 
+interface ChainMeta { start_block: number; latest_processed_block: number }
+const META_FIELDS = 'chain_metadata(where: { chain_id: { _eq: $chainId } }) { start_block latest_processed_block }';
+
+/**
+ * Envio's row for this chain, if its deployment indexes the current contracts. A deployment built before they existed
+ * (placeholder addresses, start block 0) answers with empty lists, which must read as "unavailable", not "none".
+ */
+function current(meta: ChainMeta[], network: Network): ChainMeta {
+  const row = meta[0];
+  if (!row) throw new Error('Envio has no data for this chain');
+  if (BigInt(row.start_block) !== NETWORKS[network].deployBlock) throw new Error(`Envio indexes a stale config (start block ${row.start_block})`);
+  return row;
+}
+
 /**
  * Net outflow over the last hour from Envio's hourly buckets (the current hour and the one before it,
  * so the window is never empty right after the hour turns). Null on any error: Jev is told flows are unavailable.
@@ -61,11 +75,13 @@ const usd = (assets: bigint) => Number(assets) / 10 ** USDC_DECIMALS;
 export async function readFlows(deps: EnvioDeps, network: Network, vault: Address, now: number, totalAssets: bigint): Promise<Flows | null> {
   try {
     const since = Math.floor((now - HOUR) / HOUR) * HOUR;
-    const data = await query<{ VaultFlowHour: { inAssets: string; outAssets: string; largestOut: string }[] }>(deps,
+    const data = await query<{ VaultFlowHour: { inAssets: string; outAssets: string; largestOut: string }[]; chain_metadata: ChainMeta[] }>(deps,
       `query Flows($chainId: Int!, $vault: String!, $since: numeric!) {
         VaultFlowHour(where: { chainId: { _eq: $chainId }, vault: { _eq: $vault }, hourTs: { _gte: $since } }) { inAssets outAssets largestOut }
+        ${META_FIELDS}
       }`,
       { chainId: NETWORKS[network].chain.id, vault: vault.toLowerCase(), since: String(since) });
+    current(data.chain_metadata, network);
     let net = 0n;
     let largest = 0n;
     for (const h of data.VaultFlowHour) {
@@ -102,27 +118,41 @@ const setCursor = (db: D1Database, network: Network, block: bigint) =>
 export async function readProtections(db: D1Database, deps: EnvioDeps, network: Network, vault: Address): Promise<Protection[]> {
   const chainId = NETWORKS[network].chain.id;
   try {
-    const data = await query<{ Protection: { owner: string; vault: string; minConfidenceBps: number }[]; chain_metadata: { latest_processed_block: number }[] }>(deps,
+    const data = await query<{ Protection: { owner: string; vault: string; minConfidenceBps: number }[]; chain_metadata: ChainMeta[] }>(deps,
       `query Protections($chainId: Int!) {
         Protection(where: { chainId: { _eq: $chainId }, enabled: { _eq: true } }) { owner vault minConfidenceBps }
-        chain_metadata(where: { chain_id: { _eq: $chainId } }) { latest_processed_block }
+        ${META_FIELDS}
       }`, { chainId });
-    const block = data.chain_metadata[0]?.latest_processed_block;
+    const block = current(data.chain_metadata, network).latest_processed_block;
     await db.batch([
       db.prepare('DELETE FROM protections WHERE network = ?').bind(network),
       ...data.Protection.map((p) => upsert(db, network, p.owner, p.vault, true, p.minConfidenceBps)),
-      ...(block === undefined ? [] : [setCursor(db, network, BigInt(block))]),
+      setCursor(db, network, BigInt(block)),
     ]);
     return data.Protection.filter((p) => p.vault.toLowerCase() === vault.toLowerCase()).map((p) => ({ owner: p.owner as Address, minConfidenceBps: p.minConfidenceBps }));
   } catch (err) {
     console.error(JSON.stringify({ msg: 'envio_protections_failed', network, vault, error: safeError(err) }));
   }
 
+  await catchUp(db, deps, network, { maxChunks: MAX_CHUNKS_PER_CALL, minLag: 0n }, vault);
+  return enabledFor(db, network, vault);
+}
+
+/**
+ * Keeps the local copy current from GuardianV2's logs between verdicts, a few chunks at a time, so that when Envio is
+ * down or stale the read at EXIT time has little left to replay. A no-op while the copy is within `minLag` of the head.
+ */
+export async function syncProtections(db: D1Database, deps: EnvioDeps, network: Network, budget: { maxChunks: bigint; minLag: bigint }): Promise<void> {
+  await catchUp(db, deps, network, budget, null);
+}
+
+async function catchUp(db: D1Database, deps: EnvioDeps, network: Network, { maxChunks, minLag }: { maxChunks: bigint; minLag: bigint }, vault: Address | null): Promise<void> {
   const cursor = await db.prepare(`SELECT block FROM log_cursors WHERE network = ? AND name = 'guardian'`).bind(network).first<number>('block');
   let last = cursor === null ? NETWORKS[network].deployBlock - 1n : BigInt(cursor);
   try {
     const head = await deps.getBlockNumber(network);
-    const end = head < last + CHUNK * MAX_CHUNKS_PER_CALL ? head : last + CHUNK * MAX_CHUNKS_PER_CALL;
+    if (head - last < minLag) return;
+    const end = head < last + CHUNK * maxChunks ? head : last + CHUNK * maxChunks;
     for (let from = last + 1n; from <= end; from += CHUNK) {
       const to = from + CHUNK - 1n < end ? from + CHUNK - 1n : end;
       const logs = (await deps.getGuardianLogs(network, from, to))
@@ -133,5 +163,4 @@ export async function readProtections(db: D1Database, deps: EnvioDeps, network: 
   } catch (err) {
     console.error(JSON.stringify({ msg: 'guardian_logs_failed', network, vault, lastBlock: last.toString(), error: safeError(err) }));
   }
-  return enabledFor(db, network, vault);
 }

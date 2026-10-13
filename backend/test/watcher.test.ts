@@ -22,11 +22,12 @@ function detailed(action: 'hold' | 'exit', confidence: number): DetailedPosition
 }
 
 function fakeDeps(over: Partial<WatcherDeps> & { util?: number } = {}) {
-  const calls = { posts: [] as unknown[], jobs: [] as ExitJob[], judged: 0 };
+  const calls = { posts: [] as unknown[], jobs: [] as ExitJob[], judged: 0, synced: 0 };
   const deps: WatcherDeps = {
     readVault: async () => reading(over.util ?? 5000),
     readFlows: async () => null,
     readProtections: async () => [{ owner: OWNER_A, minConfidenceBps: 9000 }, { owner: OWNER_B, minConfidenceBps: 9500 }],
+    syncProtections: async () => { calls.synced++; },
     judge: async () => { calls.judged++; return detailed('exit', 0.92); },
     post: async (...args) => {
       calls.posts.push(args);
@@ -153,6 +154,21 @@ describe('VaultWatcher', () => {
     expect(health?.last_post_at).not.toBeNull();
     expect(health?.last_error).toBeNull();
     expect(await alarmOf(stub)).not.toBeNull();
+  });
+
+  it('watcher: every tick, skip ticks included, keeps the Guardian log copy current', async () => {
+    const { deps, calls } = fakeDeps({ judge: async () => { calls.judged++; return detailed('hold', 0.8); } });
+    const stub = await startWatcher(deps);
+    await runDurableObjectAlarm(stub);
+    await runDurableObjectAlarm(stub); // a skip tick
+    expect(calls.synced).toBe(2);
+  });
+
+  it('watcher: a failing log sync never stops the tick', async () => {
+    const { deps, calls } = fakeDeps({ syncProtections: async () => { throw new Error('d1 hiccup'); } });
+    const stub = await startWatcher(deps);
+    await runDurableObjectAlarm(stub);
+    expect(calls.posts).toHaveLength(1);
   });
 
   it('watcher: unchanged stats after a post skip Jev', async () => {

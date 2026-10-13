@@ -10,7 +10,7 @@ import { toOraclePost, type StateDocument } from '../../shared/verdict';
 import { postVerdict } from './archive';
 import { afterJudgment, decide } from './decide';
 import type { Env, ExitJob } from './env';
-import { realEnvioDeps, readFlows, readProtections } from './envio';
+import { realEnvioDeps, readFlows, readProtections, syncProtections } from './envio';
 import { safeError } from './errors';
 import { ALARM_MS } from './cadence';
 import { addEvent } from './events';
@@ -22,6 +22,8 @@ export { ALARM_MS };
  * "still alive" write waits this long, because a 5 s heartbeat for every testnet vault alone overruns D1 Free's 100k rows/day.
  */
 export const HEARTBEAT_MS: Record<Network, number> = { testnet: 30_000, mainnet: 30_000 };
+/** Per tick: up to 10 getLogs chunks (1,000 blocks), and only once the copy is 500 blocks behind, to spare D1 writes. */
+export const LOG_SYNC = { maxChunks: 10n, minLag: 500n };
 
 export interface VaultReading { stats: VaultStats & { liquidityPct: number | null }; totalAssets: bigint; pps: bigint }
 export interface Protection { owner: Address; minConfidenceBps: number }
@@ -30,6 +32,8 @@ export interface WatcherDeps {
   readVault(network: Network, vault: VaultConfig): Promise<VaultReading>;
   readFlows(network: Network, vault: VaultConfig, reading: VaultReading): Promise<Flows | null>;
   readProtections(network: Network, vault: VaultConfig): Promise<Protection[]>;
+  /** A small step of the Guardian log catch-up, so an EXIT never waits on a long replay when Envio is down or stale. */
+  syncProtections(network: Network): Promise<void>;
   judge(input: PositionInput): Promise<DetailedPositionJudgment>;
   post(network: Network, vault: Address, judgment: PositionJudgment, doc: StateDocument): Promise<{ id: bigint; txHash: Hex }>;
   enqueue(job: ExitJob): Promise<void>;
@@ -85,6 +89,9 @@ export async function watchOnce(db: D1Database, vault: VaultConfig, network: Net
     console.error(JSON.stringify({ msg: 'watch_failed', stage, network, vault: address, error: message }));
     return health(null, message);
   };
+
+  await deps.syncProtections(network).catch((err: unknown) =>
+    console.error(JSON.stringify({ msg: 'watch_failed', stage: 'sync_protections', network, vault: address, error: safeError(err) })));
 
   let reading: VaultReading;
   let detail: DetailedPositionJudgment;
@@ -185,6 +192,7 @@ export class VaultWatcher extends DurableObject<Env> {
       readVault: (network, vault) => readVault(env, network, vault),
       readFlows: (network, vault, reading) => readFlows(envio, network, vault.address as Address, Math.floor(Date.now() / 1000), reading.totalAssets),
       readProtections: (network, vault) => readProtections(env.DB, envio, network, vault.address as Address),
+      syncProtections: (network) => syncProtections(env.DB, envio, network, LOG_SYNC),
       judge: (input) => judgePositionDetailed(input),
       post: (network, vault, judgment, doc) => postVerdict(env, network, vault, judgment, doc),
       enqueue: async (job) => { await env.EXITS.send(job); },
