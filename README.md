@@ -199,15 +199,46 @@ Tare takes no fees today; the contracts are fee-free. The plan, strongest first:
 | Routing and referral fees | Advisor deposits through protocol referral and curator rev-share programs | No cost to the user |
 | Launchpad fee | 0.5–1% on bonding-curve trades, plus a share of reserve yield | Launch already ships on testnet |
 
+## Future enhancements
+
+- **More judges, one oracle.** Let other models or teams post to the same oracle under their own attester, each with its own public scorecard, so users pick the judge with the best record.
+- **Yield data that doesn't lean on one source.** Compute APY onchain from share-price growth for watched vaults, add the underlying yield of yield-bearing tokens (sRUSD, savUSD, PTs), and cross-check DeFiLlama against protocol APIs.
+- **More vaults and assets.** New liquidity adapters (AUSD, MON liquid staking, more Euler and Morpho vaults), each listed only after the same five checks.
+- **Alerts where people are.** Telegram, email and push notifications for verdicts, alerts and exits, alongside the Watch feed.
+- **Move, not just exit.** Act on "move" verdicts by rotating a position into a safer vault, with the user's rule deciding where.
+
 ## What was built when
 
 - **Monad Blitz Pune V3 (10 Oct 2026), up to commit `7f90aaf`:** Explore, Pulse, Advisor, idle Scan, Launch, Jev pool verdicts, the mirror vaults, the keeper-gated Guardian v1 and the local worker (`worker/`).
 - **Monad Metropolis (11–13 Oct 2026), every commit after `7f90aaf`:** `TareRiskOracle` with permissionless, worst-sample grading; keeperless `GuardianV2`; liquidity adapters for Euler Earn and Morpho V2 with mainnet fork tests; the Cloudflare backend; the Envio indexer; the Testnet / Mainnet switch, Watch v2, Ledger and Docs pages; the mainnet deploy.
 
-## AI disclosure
+## Disclosures
 
+**AI tools**
 - **Claude Code** (Anthropic) was used throughout as a coding assistant: writing code and tests, reviewing contracts for security, and drafting docs. Product decisions, vault selection, wallets, keys and every deploy were the author's.
 - **Jev** (TypeSafe's System One model) is part of the product: it answers the typed questions behind every pool and position verdict at runtime. It never holds keys; fixed rules in code and contracts decide what happens.
+
+**Status and risk**
+- The contracts are **not audited**. Mainnet deposits in the app are capped at $1,000 per wallet for that reason.
+- Verdicts are forecasts, not guarantees or financial advice. The vaults are run by Euler and Morpho curators, not Tare, and can lose value or lock withdrawals. Tare never holds user funds.
+
+**Trust assumptions** (all single keys today, no multisig yet)
+- The **attester** posts verdicts. A compromised attester could post a fresh EXIT; exits would still pay only opted-in owners, to their own wallets.
+- The **oracle owner** can change the attester and register vaults (`setAttester`, `registerVault`). It can't edit or delete posted verdicts or grades.
+- The **Guardian admin** can only approve or unapprove vaults.
+
+**Data and third parties**
+- Pool yields and TVL come from DeFiLlama; mainnet liquidity, share price and grades are read onchain.
+- The indexer runs on Envio Cloud's development tier; RPC is Alchemy on mainnet and the public Monad RPC otherwise; the backend runs on Cloudflare.
+
+**Testnet data**
+- Testnet mirror vaults are operator-controlled for demos, and the testnet Ledger includes stress tests that are reset before grading. The real track record is on mainnet.
+
+**Author's positions**
+- The author's wallet (`0x52b1…Af3f`) holds the proof deposits on mainnet: about 2.5 USDC in each watched vault, with Guardian on.
+
+**Prior work**
+- The Blitz build (up to commit `7f90aaf`) is the starting point; see "What was built when".
 
 ## Built with
 
