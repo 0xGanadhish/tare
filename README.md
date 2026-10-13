@@ -64,7 +64,7 @@ On mainnet, `sample(id)` can be called by anyone for one hour before grading, an
 
 ## Why Monad
 
-Posting **every** verdict onchain costs about 0.03 MON on Monad, so 25 MON keeps both mainnet vaults fully public for about a month at ten verdicts per vault per day. Sampling, grading and exits are paid by a separate executor wallet. Speed matters as much as cost: a protective exit races everyone else heading for the door, and the Blitz demo's Guardian exit confirmed in 2.2 s ([tx](https://testnet.monadvision.com/tx/0x22d5ffad10ba384975565640eca72fa39de616538283f436405162b43172abb4)). Monad makes "post everything, grade everything, let anyone act" cheap enough to be the default.
+Posting a verdict onchain costs about 0.05–0.06 MON on Monad, and sampling it twice and grading it about 0.07–0.10 MON more, paid by a separate executor wallet (Monad bills the full gas limit; measured against the live mainnet contracts). So a vault re-judged ten times a day stays fully public, every verdict posted, sampled and graded, for about 1.2–1.6 MON a day. Speed matters as much as cost: a protective exit races everyone else heading for the door, and the Blitz demo's Guardian exit confirmed in 2.2 s ([tx](https://testnet.monadvision.com/tx/0x22d5ffad10ba384975565640eca72fa39de616538283f436405162b43172abb4)). Monad makes "post everything, grade everything, let anyone act" cheap enough to be the default.
 
 ## Mainnet vaults
 

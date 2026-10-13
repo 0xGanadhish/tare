@@ -6,7 +6,7 @@ import { rpcFor, secretFor, type Env, type KeyRole } from './env';
 import { json } from './http';
 import { HEARTBEAT_MS } from './watcher';
 
-/** Below this a key goes red. Mainnet: ~15 verdict posts at ~0.028 MON each, so the warning comes hours before posts stop. */
+/** Below this a key goes red. Mainnet: ~10 verdict posts at ~0.05 MON, or sampling and grading ~5 verdicts, so the warning comes hours before the key runs dry. */
 export const MIN_BALANCE_WEI: Record<Network, bigint> = { testnet: 5n * 10n ** 16n, mainnet: 5n * 10n ** 17n }; // 0.05 / 0.5 MON
 const ROLES: KeyRole[] = ['attester', 'executor'];
 
