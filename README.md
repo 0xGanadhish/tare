@@ -232,7 +232,7 @@ Tare takes no fees today; the contracts are fee-free. The plan, strongest first:
 - The indexer runs on Envio Cloud's development tier; RPC is Alchemy on mainnet and the public Monad RPC otherwise; the backend runs on Cloudflare.
 
 **Testnet data**
-- Testnet mirror vaults are operator-controlled for demos, and the testnet Ledger includes stress tests that are reset before grading. The real track record is on mainnet.
+- Testnet mirror vaults are operator-controlled for demos, and the testnet Ledger includes stress tests run on purpose, graded like any other verdict. The real track record is on mainnet.
 
 **Author's positions**
 - The author's wallet (`0x52b1…Af3f`) holds the proof deposits on mainnet: about 2.5 USDC in each watched vault, with Guardian on.
