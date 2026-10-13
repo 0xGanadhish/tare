@@ -23,16 +23,20 @@ export function fitSummary(rec: Recommendation, intent: Intent, network: Network
   const risk = RISK[intent.risk.value];
   const judged = verdict.label !== 'NOT_JUDGED';
   const asset = intent.assetPref.value === 'any' ? null : ASSET[intent.assetPref.value];
+  const max = MAX_RISK[intent.risk.value];
+  // Covered vaults can sit above the risk limit (the top picks never do): say so rather than claim a match.
+  const over = judged && max != null && verdict.risk != null && verdict.risk > max ? verdict.risk.toFixed(1) : null;
 
   const usd = rec.expectedReturnUsd;
   const gain = usd <= 0 ? `Fits ${horizon}` : `≈ ${usd < 1 ? 'under $1' : `$${Math.round(usd).toLocaleString('en-US')}`} over ${horizon}`;
-  const fit = judged ? `matches your ${[risk, asset].filter(Boolean).join(', ')} pick` : 'not judged yet, so check it before depositing';
+  const fit = over ? `risk ${over}, above your ${risk} limit of ${max}`
+    : judged ? `matches your ${[risk, asset].filter(Boolean).join(', ')} pick` : 'not judged yet, so check it before depositing';
   const line = `${gain} · ${fit}`;
 
-  const max = MAX_RISK[intent.risk.value];
   const details = [
     `Base yield ${pool.realApy.toFixed(1)}% a year, not counting token rewards`,
-    ...(judged ? [max == null ? `Your ${risk} pick accepts any risk short of AVOID` : `Within your ${risk} limit of risk ${max} or less`] : []),
+    ...(over ? [`Risk ${over} of 5 is above your ${risk} limit of ${max}`]
+      : judged ? [max == null ? `Your ${risk} pick accepts any risk short of AVOID` : `Within your ${risk} limit of risk ${max} or less`] : []),
     pool.maturity ? `Ends ${day(pool.maturity)}, inside your ${horizon}` : `No end date listed, so it fits ${horizon}`,
     ...(asset ? [] : [`Any asset accepted; this one is a ${ASSET[pool.assetClass]}`]),
   ];

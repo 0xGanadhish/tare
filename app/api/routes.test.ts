@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { Intent, Pool, Verdict } from '../../shared/types';
 import fixture from '../../fixtures/pools.json';
+import { NETWORKS } from '../../shared/networks';
 import { GET as poolsGET } from './pools/route';
 import { GET as poolGET } from './pools/[id]/route';
 import { POST as intentPOST } from './intent/route';
@@ -133,6 +134,17 @@ test('advice respects asset/risk/avoid filters, ranks real APY, and links exact 
   expect(result.recommendations.map((r: { pool: Pool }) => r.pool.id)).toEqual(['higher', 'stable']);
   expect(result.recommendations[1].mirrorVault).toBe(vault);
   expect(result.recommendations[0].expectedReturnUsd).toBeCloseTo(500 * 3 / 100 * 90 / 365);
+});
+test('advice lists the Tare vaults on the requested network that the top picks left out', async () => {
+  const clearstar = NETWORKS.mainnet.vaults.find((v) => v.name === 'Clearstar Earn USDC')!;
+  const extra: Pool = { ...pools[0], id: clearstar.poolId!, realApy: 0.5 };
+  mocks.readPools.mockResolvedValue({ pools: [...pools, extra], asOf: '2026-10-10T00:00:00Z' });
+  mocks.readVerdicts.mockResolvedValue({ ...verdicts, [extra.id]: { ...verdicts.stable, poolId: extra.id, label: 'CONSIDER', risk: 2.23 } });
+  const mainnet = await (await advisePOST(request('/api/advise', { intent, network: 'mainnet' }))).json();
+  expect(mainnet.recommendations.map((r: { pool: Pool }) => r.pool.id)).toEqual(['higher', 'stable']);
+  expect(mainnet.covered.map((r: { pool: Pool }) => r.pool.id)).toEqual([extra.id]);
+  expect((await (await advisePOST(request('/api/advise', { intent }))).json()).covered).toEqual([]);
+  expect((await advisePOST(request('/api/advise', { intent, network: 'devnet' }))).status).toBe(400);
 });
 test.each([
   {}, { intent: { ...intent, amount: -1 } }, { intent: { ...intent, risk: { value: 'yolo', confidence: 1 } } },

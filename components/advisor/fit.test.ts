@@ -53,4 +53,11 @@ describe('fitSummary', () => {
     const dated = { ...pool, maturity: '2026-12-17' };
     expect(fitSummary(rec({ pool: dated }), intent, 'testnet').details).toContain('Ends 17 Dec 2026, inside your 3 months');
   });
+
+  test('a covered vault above the risk limit says so instead of claiming a match', () => {
+    const { line, details } = fitSummary(rec({ verdict: { ...verdict, risk: 2.23 } }), intent, 'testnet');
+    expect(line).toBe('≈ $8 over 3 months · risk 2.2, above your safe limit of 2');
+    expect(details).toContain('Risk 2.2 of 5 is above your safe limit of 2');
+    expect(details.join(' ')).not.toMatch(/Within your/);
+  });
 });

@@ -6,7 +6,7 @@ import { VerdictSlip } from '@/components/slip/VerdictSlip';
 import { Button } from '@/components/ui/Button';
 import type { Intent, Recommendation } from '@/shared/types';
 import { SlipAction } from '@/components/slip/SlipAction';
-import { useNetwork } from '@/components/network/NetworkProvider';
+import { networkLabel, useNetwork } from '@/components/network/NetworkProvider';
 import { IntentChips, needsPick } from './IntentChips';
 import { fitSummary } from './fit';
 
@@ -35,6 +35,7 @@ export function AdvisorClient() {
   const [text, setText] = useState(prefill);
   const [intent, setIntent] = useState<Intent | null>(null);
   const [recs, setRecs] = useState<Recommendation[] | null>(null);
+  const [protectable, setProtectable] = useState<Recommendation[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,14 +47,17 @@ export function AdvisorClient() {
     setBusy(true);
     setError(null);
     try {
-      const { recommendations } = await post<{ recommendations: Recommendation[] }>('/api/advise', { intent: i });
-      if (mine === seq.current) setRecs(recommendations.slice(0, 3));
+      const res = await post<{ recommendations: Recommendation[]; covered?: Recommendation[] }>('/api/advise', { intent: i, network });
+      if (mine === seq.current) {
+        setRecs(res.recommendations.slice(0, 3));
+        setProtectable(res.covered ?? []);
+      }
     } catch (e) {
       if (mine === seq.current) setError(e instanceof Error ? e.message : 'Could not get recommendations');
     } finally {
       if (mine === seq.current) setBusy(false);
     }
-  }, []);
+  }, [network]);
 
   const submit = useCallback(
     async (raw: string) => {
@@ -64,6 +68,7 @@ export function AdvisorClient() {
       setError(null);
       setNotice(null);
       setRecs(null);
+      setProtectable([]);
       let parsed: Intent;
       try {
         parsed = await post<Intent>('/api/intent', { text: q });
@@ -90,9 +95,52 @@ export function AdvisorClient() {
     }
   }, [prefill, submit]);
 
+  // The Tare vaults differ per network, so ask again when the header switch changes it.
+  const shownFor = useRef(network);
+  useEffect(() => {
+    if (shownFor.current === network) return;
+    shownFor.current = network;
+    if (intent && !needsPick(intent)) void advise(intent);
+  }, [network, intent, advise]);
+
   const onChips = (next: Intent) => {
     setIntent(next);
     if (!needsPick(next)) void advise(next);
+  };
+
+  const card = (r: Recommendation) => {
+    const fit = intent ? fitSummary(r, intent, network) : null;
+    return (
+      <VerdictSlip
+        key={r.pool.id}
+        pool={r.pool}
+        verdict={r.verdict}
+        action={
+          <div>
+            {fit && (
+              <div className="mb-3">
+                <p className="text-[13px] text-ink">{fit.line}</p>
+                <details className="group mt-1.5">
+                  <summary className="mono inline-block cursor-pointer select-none list-none text-[11px] uppercase tracking-[0.06em] text-secondary hover:text-ink [&::-webkit-details-marker]:hidden">
+                    <span className="group-open:hidden">Details ▾</span>
+                    <span className="hidden group-open:inline">Hide details ▴</span>
+                  </summary>
+                  <ul className="mt-2 space-y-1 text-[12px] leading-snug text-secondary">
+                    {fit.details.map((d) => (
+                      <li key={d} className="flex gap-2">
+                        <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink/30" />
+                        <span>{d}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </div>
+            )}
+            <SlipAction pool={r.pool} defaultAmount={intent?.amount} note={false} />
+          </div>
+        }
+      />
+    );
   };
 
   return (
@@ -144,41 +192,17 @@ export function AdvisorClient() {
         <section className="mt-8">
           <h2 className="mono mb-3 text-[10.5px] uppercase tracking-[0.06em] text-muted">Top {recs.length} for you</h2>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {recs.map((r) => {
-              const fit = intent ? fitSummary(r, intent, network) : null;
-              return (
-                <VerdictSlip
-                  key={r.pool.id}
-                  pool={r.pool}
-                  verdict={r.verdict}
-                  action={
-                    <div>
-                      {fit && (
-                        <div className="mb-3">
-                          <p className="text-[13px] text-ink">{fit.line}</p>
-                          <details className="group mt-1.5">
-                            <summary className="mono inline-block cursor-pointer select-none list-none text-[11px] uppercase tracking-[0.06em] text-secondary hover:text-ink [&::-webkit-details-marker]:hidden">
-                              <span className="group-open:hidden">Details ▾</span>
-                              <span className="hidden group-open:inline">Hide details ▴</span>
-                            </summary>
-                            <ul className="mt-2 space-y-1 text-[12px] leading-snug text-secondary">
-                              {fit.details.map((d) => (
-                                <li key={d} className="flex gap-2">
-                                  <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink/30" />
-                                  <span>{d}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        </div>
-                      )}
-                      <SlipAction pool={r.pool} defaultAmount={intent?.amount} note={false} />
-                    </div>
-                  }
-                />
-              );
-            })}
+            {recs.map(card)}
           </div>
+        </section>
+      )}
+      {recs && protectable.length > 0 && (
+        <section className="mt-10">
+          <h2 className="mono text-[10.5px] uppercase tracking-[0.06em] text-muted">Deposit with Guardian on {networkLabel(network)}</h2>
+          <p className="mb-3 mt-1 max-w-[640px] text-[12.5px] text-secondary">
+            The vaults Tare watches here, so Guardian can take you out on an EXIT verdict. Listed apart from the top picks above.
+          </p>
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{protectable.map(card)}</div>
         </section>
       )}
     </div>
