@@ -3,10 +3,10 @@ import { ALERT_CONFIDENCE, FALLBACK_UTIL_BPS, REJUDGE_APY_BPS, REJUDGE_UTIL_BPS 
 import { VERDICT_RULES as R } from '@/lib/judge/combine';
 import { EARLY_BELOW } from '@/shared/score';
 import { MIN_BAND_VERDICTS } from '@/components/ledger/format';
-import { MAINNET_SOFT_CAP_USD, NETWORKS, UNDEPLOYED, type Network } from '@/shared/networks';
+import { MAINNET_SOFT_CAP_USD, NETWORKS, UNDEPLOYED, type Network, type VaultConfig } from '@/shared/networks';
 import { addressUrl } from '@/components/tx/explorer';
 import mainnetVaultConfig from '@/contracts/script/vaults.mainnet.json';
-import { A, Callout, Checklist, Code, Facts, Flow, OneLine, Section, Stamp, Steps, Strong, Table, Terms, VerdictRows, paper } from './blocks';
+import { A, Callout, Checklist, Code, CodeBlock, Facts, Flow, OneLine, Section, Stamp, Steps, Strong, Table, Terms, VerdictRows, paper } from './blocks';
 
 /*
  * Plain-language docs, one article per topic in topics.ts. Numbers the app already exports are imported, so the docs
@@ -28,6 +28,18 @@ export const CHECK_EVERY: Record<Network, string> = { testnet: '15 seconds', mai
 const MAINNET_VAULT_NAMES = (NETWORKS.mainnet.vaults.length ? NETWORKS.mainnet.vaults : mainnetVaultConfig.vaults).map((v) => v.name);
 /** Net outflow over the last hour, as a share of the vault, that makes Jev look again (backend `OUTFLOW_REJUDGE_PCT`). */
 export const OUTFLOW_PCT = 10;
+
+/** TareRiskOracle grading thresholds and reason bits (Solidity constants; docs.test.tsx reads the source to check them). */
+export const ORACLE_GRADING = {
+  ppsDropBps: 50, tvlDropBps: 2_000, liqFloorBps: 500,
+  reasons: { pps: 1, tvl: 2, liq: 4, broken: 8 },
+} as const;
+/** GuardianV2's own bounds on a rule (Solidity constants; the app's slider is a subset). */
+export const GUARDIAN_RULE_LIMITS = { minConfidenceBps: 8_000, maxConfidenceBps: 9_900, minMaxAge: 60, maxMaxAge: 3_600 } as const;
+/** The Envio entities a developer can query (indexer/schema.graphql, minus internal bookkeeping). */
+export const INDEXED_ENTITIES = ['Verdict', 'Protection', 'Exit', 'VaultFlowHour', 'LargeWithdrawal'] as const;
+/** The full developer reference in the repo. */
+export const DEV_GUIDE_URL = 'https://github.com/0xGanadhish/tare/blob/main/docs/developers.md';
 
 export const API_BASE = 'https://api.tarefi.xyz';
 export const STATE_URL = 'https://ledger.tarefi.xyz/state/{stateHash}.json';
@@ -547,6 +559,260 @@ function Api() {
           ]}
         />
       </Section>
+      <Section id="indexer" title="The Envio indexer">
+        <p>
+          Tare&apos;s own events and the watched vaults&apos; deposits and withdrawals are indexed on both networks with Envio HyperIndex, into one GraphQL
+          schema. Ids start with the chain id ({NETWORKS.mainnet.chain.id} mainnet, {NETWORKS.testnet.chain.id} testnet) and addresses are lowercase.
+        </p>
+        <Terms
+          items={[
+            ['Verdict', 'Every oracle post with its grade, linked to the exits it caused.'],
+            ['Protection', 'Each wallet’s Guardian rule per vault, on or off.'],
+            ['Exit', 'Every Guardian exit: who, how much, which verdict, who called it.'],
+            ['VaultFlowHour', 'Deposits, withdrawals and the largest withdrawal per vault per hour. Jev is shown these.'],
+            ['LargeWithdrawal', 'Single withdrawals of at least 1% of a vault.'],
+          ]}
+        />
+        <CodeBlock label="GraphQL · latest verdicts on a vault">{`query {
+  Verdict(where: { chainId: { _eq: ${NETWORKS.mainnet.chain.id} }, vault: { _eq: "${(NETWORKS.mainnet.vaults[0]?.address ?? '0x…').toLowerCase()}" } },
+          order_by: { postId: desc }, limit: 5) {
+    postId verdict confidenceBps resolved adverse reasons txHash
+    exits { owner assets remainingShares txHash }
+  }
+}`}</CodeBlock>
+        <p>
+          Run it yourself with <Code>pnpm -C indexer dev</Code> (GraphQL at <Code>localhost:8080/v1/graphql</Code>). The schema is in{' '}
+          <A href="https://github.com/0xGanadhish/tare/blob/main/indexer/schema.graphql">indexer/schema.graphql</A>.
+        </p>
+      </Section>
+      <FullReference />
+    </>
+  );
+}
+
+function AddressLink({ address, network }: { address: string; network: Network }) {
+  return address === UNDEPLOYED ? (
+    <span className="text-muted">Not deployed yet</span>
+  ) : (
+    <a href={addressUrl(address, network)} target="_blank" rel="noopener noreferrer" className="mono break-all text-[12px] text-ink underline decoration-hairline underline-offset-4">
+      {address}
+    </a>
+  );
+}
+
+const ADAPTER_NAME: Record<VaultConfig['protocol'], string> = { euler: 'EulerEarnAdapter', morpho: 'MorphoV2Adapter', mirror: 'MirrorAdapter' };
+
+function FullReference() {
+  return (
+    <p className="mt-12 border-t border-hairline pt-6 text-[13.5px] text-secondary">
+      Every signature, response shape and query in one file: <A href={DEV_GUIDE_URL}>docs/developers.md</A> on GitHub.
+    </p>
+  );
+}
+
+function Contracts() {
+  return (
+    <>
+      <OneLine>Two contracts do the work: the oracle records and grades every verdict, and GuardianV2 acts on them. Neither can be upgraded.</OneLine>
+      {(['mainnet', 'testnet'] as const).map((n) => {
+        const c = NETWORKS[n];
+        return (
+          <Section key={n} id={n} title={n === 'mainnet' ? `Monad mainnet (${c.chain.id})` : `Monad testnet (${c.chain.id})`}>
+            <Table
+              head={['Contract', 'Address']}
+              rows={[
+                ['TareRiskOracle', <AddressLink key="o" address={c.oracle} network={n} />],
+                ['GuardianV2', <AddressLink key="g" address={c.guardian} network={n} />],
+                [n === 'mainnet' ? 'USDC' : 'Test USDC', <AddressLink key="u" address={c.usdc} network={n} />],
+              ]}
+            />
+            <Table
+              head={['Watched vault', 'Vault', 'Liquidity adapter']}
+              rows={c.vaults.map((v) => [
+                v.name,
+                <AddressLink key="v" address={v.address} network={n} />,
+                v.adapter ? (
+                  <span key="a">
+                    <span className="mb-1 block text-[12px] text-muted">{ADAPTER_NAME[v.protocol]}</span>
+                    <AddressLink address={v.adapter} network={n} />
+                  </span>
+                ) : (
+                  <span key="a" className="text-muted">None</span>
+                ),
+              ])}
+            />
+          </Section>
+        );
+      })}
+      <Section id="abis" title="ABIs and source">
+        <p>
+          Every contract is source-verified on Sourcify, which MonadVision shows. The ABIs the app and backend use are in{' '}
+          <A href="https://github.com/0xGanadhish/tare/blob/main/shared/contracts.ts">shared/contracts.ts</A> (<Code>abis.oracle</Code>,{' '}
+          <Code>abis.guardianV2</Code>), and the addresses above come straight from <Code>shared/addresses.mainnet.json</Code> and{' '}
+          <Code>shared/addresses.testnet.json</Code>, which the deploy script writes.
+        </p>
+      </Section>
+      <FullReference />
+    </>
+  );
+}
+
+function BuildOracle() {
+  const g = ORACLE_GRADING;
+  const pctOf = (bps: number) => `${bps / 100}%`;
+  return (
+    <>
+      <OneLine>Two view calls tell you what Jev thinks of a vault right now, and the contract grades every call it ever made.</OneLine>
+      <Section id="read" title="Read the latest verdict">
+        <p>
+          <Code>latest(vault)</Code> returns the newest verdict id for a vault (0 if there is none), and <Code>getPost(id)</Code> returns the verdict itself.
+        </p>
+        <CodeBlock label="Solidity · TareRiskOracle">{`enum Verdict { HOLD, EXIT, MOVE }
+
+struct Post {
+    address vault;
+    Verdict verdict;
+    uint16 confidenceBps;     // how sure Jev is, 0–10,000
+    uint16 riskBps;           // Jev's risk score, 0–10,000
+    bytes32 stateHash;        // keccak256 of what Jev was shown
+    uint64 postedAt;
+    uint256 ppsAtPost;        // share price snapshot
+    uint256 assetsAtPost;     // total assets snapshot
+    uint256 liquidityAtPost;  // withdrawable now, from the adapter
+}
+
+function latest(address vault) external view returns (uint256 id);
+function getPost(uint256 id) external view returns (Post memory);
+function getResolution(uint256 id) external view returns (Resolution memory);`}</CodeBlock>
+        <p>For example, a vault or lending market that stops taking deposits while a confident, fresh EXIT stands:</p>
+        <CodeBlock label="Solidity · your contract">{`uint256 id = oracle.latest(vault);
+if (id != 0) {
+    TareRiskOracle.Post memory p = oracle.getPost(id);
+    bool risky = p.verdict == TareRiskOracle.Verdict.EXIT
+        && p.confidenceBps >= 9_000
+        && block.timestamp - p.postedAt <= 1 hours;
+    require(!risky, "Tare: exit verdict");
+}`}</CodeBlock>
+        <CodeBlock label="TypeScript · viem">{`import { abis } from './shared/contracts';
+
+const id = await client.readContract({ address: oracle, abi: abis.oracle, functionName: 'latest', args: [vault] });
+const post = await client.readContract({ address: oracle, abi: abis.oracle, functionName: 'getPost', args: [id] });`}</CodeBlock>
+      </Section>
+      <Section id="grading" title="How every verdict is graded">
+        <p>Anyone can grade a verdict once its window has passed. The contract compares the vault against the snapshot taken when the verdict was posted.</p>
+        <Table
+          head={['Phase', 'Mainnet', 'Testnet', 'Call']}
+          rows={[
+            ['Open', `first ${RESOLVE_WINDOW.mainnet}`, `first ${RESOLVE_WINDOW.testnet}`, 'nothing yet'],
+            ['Sampling', `the next ${SAMPLE_WINDOW.mainnet}`, 'none', <Code key="s">sample(id)</Code>],
+            ['Gradable', 'after that', 'after that', <Code key="r">resolve(id)</Code>],
+          ]}
+        />
+        <p>
+          <Code>sample</Code> keeps the worst share price, total assets and withdrawable cash it sees, so a flash loan can&apos;t make a vault look healthier.{' '}
+          <Code>resolve</Code> grades on those worst values, or reads once if nobody sampled. Any reason below makes the grade adverse:
+        </p>
+        <Table
+          head={['Bit', 'Reason', 'When']}
+          rows={[
+            [String(g.reasons.pps), <Code key="p">REASON_PPS</Code>, `share price fell more than ${pctOf(g.ppsDropBps)}`],
+            [String(g.reasons.tvl), <Code key="t">REASON_TVL</Code>, `total assets fell more than ${pctOf(g.tvlDropBps)}`],
+            [String(g.reasons.liq), <Code key="l">REASON_LIQ</Code>, `withdrawable cash under ${pctOf(g.liqFloorBps)} of total assets (vaults with an adapter)`],
+            [String(g.reasons.broken), <Code key="b">REASON_BROKEN</Code>, 'the vault stopped answering'],
+          ]}
+        />
+        <p>An adverse grade on an EXIT means Jev was right to warn. On a HOLD it means Jev missed something.</p>
+      </Section>
+      <Section id="events" title="Events">
+        <CodeBlock label="Solidity · events">{`event VerdictPosted(uint256 indexed id, address indexed vault, Verdict verdict,
+                    uint16 confidenceBps, uint16 riskBps, bytes32 stateHash, uint64 postedAt);
+event VerdictSampled(uint256 indexed id, bool broken, uint256 pps, uint256 assets, uint16 liquidityBps);
+event VerdictResolved(uint256 indexed id, bool adverse, uint8 reasons);`}</CodeBlock>
+      </Section>
+      <Section id="state" title="Check what Jev saw">
+        <p>
+          Each <Code>stateHash</Code> is the keccak256 of a JSON file archived at <span className="mono break-all text-[12.5px]">{STATE_URL}</span>. The file
+          holds the exact bytes that were hashed, so re-hashing it must give the onchain value:
+        </p>
+        <CodeBlock label="Shell">{`H=<stateHash from getPost>
+cast keccak "$(curl -s https://ledger.tarefi.xyz/state/$H.json)"   # prints $H`}</CodeBlock>
+      </Section>
+      <FullReference />
+    </>
+  );
+}
+
+function BuildGuardian() {
+  const l = GUARDIAN_RULE_LIMITS;
+  const n = (x: number) => x.toLocaleString('en-US');
+  return (
+    <>
+      <OneLine>Two transactions from the user, and their position is protected. You don&apos;t run a keeper, and funds can only go back to them.</OneLine>
+      <Section id="enable" title="Turn protection on">
+        <Steps
+          items={[
+            { title: 'Approve the vault shares to GuardianV2', body: 'The allowance caps how many shares Guardian can ever redeem.' },
+            { title: 'Call enable(vault, minConfidenceBps, maxAge)', body: 'The user’s own rule: how sure the verdict must be, and how old it may be.' },
+          ]}
+        />
+        <CodeBlock label="TypeScript · viem">{`await wallet.writeContract({ address: vault, abi: erc20Abi, functionName: 'approve', args: [guardian, maxUint256] });
+// exit on EXIT verdicts at 85% or more that are at most 10 minutes old
+await wallet.writeContract({ address: guardian, abi: abis.guardianV2, functionName: 'enable', args: [vault, 8_500, 600] });`}</CodeBlock>
+        <Table
+          head={['Rule field', 'Allowed']}
+          rows={[
+            [<Code key="c">minConfidenceBps</Code>, `${n(l.minConfidenceBps)}–${n(l.maxConfidenceBps)}`],
+            [<Code key="a">maxAge</Code>, `${n(l.minMaxAge)}–${n(l.maxMaxAge)} seconds`],
+          ]}
+        />
+        <p>
+          <Code>enable</Code> only works on vaults the admin approved. Calling it again replaces the rule, and <Code>disable(vault)</Code> turns it off.
+        </p>
+      </Section>
+      <Section id="exit" title="Who can trigger an exit">
+        <p>
+          Anyone can call <Code>exit(vault, owner)</Code>. Tare&apos;s backend does within seconds of an EXIT verdict, and you can run your own caller as a
+          backup. It reverts unless all of these hold:
+        </p>
+        <Checklist
+          label="Exit conditions"
+          items={[
+            'The vault is approved and the owner’s rule is on.',
+            'The oracle’s latest verdict on the vault is EXIT.',
+            'Its confidence is at or above the owner’s minimum.',
+            'It is no older than the owner’s maxAge, and was posted after they turned the rule on.',
+            'It hasn’t already been used to fully exit this owner.',
+          ]}
+        />
+        <p>
+          The shares are redeemed <Strong>to the owner</Strong>. If the vault can&apos;t pay everything, Guardian takes what it can, and the same verdict can
+          finish the job later. Events: <Code>Enabled</Code>, <Code>Disabled</Code>, <Code>Exited</Code>.
+        </p>
+      </Section>
+      <FullReference />
+    </>
+  );
+}
+
+function RunYourOwn() {
+  return (
+    <>
+      <OneLine>Tare is MIT-licensed. Bring your own judge, deploy your own oracle, and get graded by exactly the same rules.</OneLine>
+      <Section id="steps" title="Steps">
+        <Steps
+          items={[
+            { title: 'Deploy the contracts', body: <>Run <Code>contracts/script/DeployV2.s.sol</Code> with <Code>ATTESTER</Code> set to your posting key&apos;s address. On mainnet it checks each vault&apos;s adapter before registering it, and writes <Code>shared/addresses.&lt;network&gt;.json</Code>.</> },
+            { title: 'Give the backend its keys', body: <>Set <Code>ATTESTER_KEY_*</Code> and <Code>EXECUTOR_KEY_*</Code> as Cloudflare secrets, one wallet per role per network, then <Code>wrangler deploy</Code> in <Code>backend/</Code>.</> },
+            { title: 'Swap the judge', body: <>Replace the Jev calls in <Code>lib/judge/index.ts</Code> with your model. The fixed rules in <Code>lib/judge/gating.ts</Code> still turn its answers into verdicts.</> },
+            { title: 'Point the indexer at your addresses', body: <>Run <Code>pnpm -C indexer gen-config --strict</Code>, then deploy it.</> },
+          ]}
+        />
+        <Callout title="Comparable by design">
+          Your verdicts are graded by the same contract code as Tare&apos;s, so two judges can be compared on the same scorecard. Letting several judges post to
+          one shared oracle, each with its own record, is next on the roadmap.
+        </Callout>
+      </Section>
+      <FullReference />
     </>
   );
 }
@@ -589,6 +855,10 @@ export const ARTICLES: Record<string, () => ReactNode> = {
   guardian: Guardian,
   ledger: Ledger,
   networks: Networks,
-  api: Api,
   risks: Risks,
+  contracts: Contracts,
+  'build-oracle': BuildOracle,
+  'build-guardian': BuildGuardian,
+  api: Api,
+  'run-your-own': RunYourOwn,
 };

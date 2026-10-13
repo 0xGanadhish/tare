@@ -1,5 +1,5 @@
 /** The docs, in reading order. The hub, the sidebar and prev/next all read from this list. */
-export type DocGroup = 'Start here' | 'Find' | 'Decide' | 'Protect' | 'Reference';
+export type DocGroup = 'Start here' | 'Find' | 'Decide' | 'Protect' | 'Reference' | 'Developers';
 
 export interface DocTopic {
   slug: string;
@@ -13,7 +13,7 @@ export interface DocTopic {
   isNew?: boolean;
 }
 
-export const DOC_GROUPS: DocGroup[] = ['Start here', 'Find', 'Decide', 'Protect', 'Reference'];
+export const DOC_GROUPS: DocGroup[] = ['Start here', 'Find', 'Decide', 'Protect', 'Reference', 'Developers'];
 
 export const DOC_TOPICS: DocTopic[] = [
   { slug: 'what-is-tare', title: 'What is Tare', group: 'Start here', blurb: 'Weigh, choose, guard. The whole idea in one page.' },
@@ -25,8 +25,12 @@ export const DOC_TOPICS: DocTopic[] = [
   { slug: 'guardian', title: 'Guardian v2', group: 'Protect', blurb: 'An exit rule you set. Anyone can trigger it, only you get paid.', app: { href: '/app/watch', label: 'Set a rule on Watch' }, isNew: true },
   { slug: 'ledger', title: 'Verdict Ledger', group: 'Protect', blurb: 'Every verdict, posted onchain and graded in public.', app: { href: '/app/ledger', label: 'Open the Ledger' }, isNew: true },
   { slug: 'networks', title: 'Testnet and mainnet', group: 'Reference', blurb: 'What changes when you flip the switch in the header.' },
-  { slug: 'api', title: 'Public API', group: 'Reference', blurb: 'The same data, as JSON, for anyone to read.' },
   { slug: 'risks', title: 'Risks and disclosures', group: 'Reference', blurb: 'What can still go wrong, said plainly.' },
+  { slug: 'contracts', title: 'Contracts and addresses', group: 'Developers', blurb: 'Every deployed contract on both networks, verified, with explorer links.' },
+  { slug: 'build-oracle', title: 'Read the oracle', group: 'Developers', blurb: 'Read verdicts and grades from your own contract or app.' },
+  { slug: 'build-guardian', title: 'Protect your users', group: 'Developers', blurb: 'Add keeperless exits to any wallet or vault UI with GuardianV2.' },
+  { slug: 'api', title: 'Public API and indexer', group: 'Developers', blurb: 'The same data as JSON, or as GraphQL from the Envio indexer.' },
+  { slug: 'run-your-own', title: 'Run your own Tare', group: 'Developers', blurb: 'Deploy with your own judge and get graded by the same rules.' },
 ];
 
 export const topicBySlug = (slug: string): DocTopic | undefined => DOC_TOPICS.find((t) => t.slug === slug);

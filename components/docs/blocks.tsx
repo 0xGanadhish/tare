@@ -24,6 +24,18 @@ export function Section({ id, title, children }: { id: string; title: string; ch
   );
 }
 
+/** A titled code sample: a label bar (language or file) over a scrollable monospace block. */
+export function CodeBlock({ label, children }: { label: string; children: string }) {
+  return (
+    <div className={`${PAPER} mt-4 overflow-hidden`}>
+      <div className="mono border-b border-hairline px-4 py-2 text-[10.5px] uppercase tracking-[0.08em] text-muted">{label}</div>
+      <pre className="mono overflow-x-auto px-4 py-3 text-[12.5px] leading-relaxed text-ink">
+        <code>{children}</code>
+      </pre>
+    </div>
+  );
+}
+
 export function Strong({ children }: { children: ReactNode }) {
   return <strong className="font-medium text-ink">{children}</strong>;
 }

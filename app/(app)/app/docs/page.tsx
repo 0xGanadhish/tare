@@ -17,7 +17,8 @@ export default function DocsHubPage() {
   const intro = topicBySlug('what-is-tare')!;
   const guardian = topicBySlug('guardian')!;
   const ledger = topicBySlug('ledger')!;
-  const rest = DOC_TOPICS.filter((t) => !FEATURED.includes(t.slug));
+  const rest = DOC_TOPICS.filter((t) => !FEATURED.includes(t.slug) && t.group !== 'Developers');
+  const dev = DOC_TOPICS.filter((t) => t.group === 'Developers');
 
   return (
     <div>
@@ -91,6 +92,28 @@ export default function DocsHubPage() {
               <h3 className="mt-5 text-[17px] font-semibold tracking-[-0.015em] text-ink">{t.title}</h3>
               <p className="mt-1.5 text-[13px] leading-snug text-secondary">{t.blurb}</p>
               <span className="mono mt-auto pt-4 text-[11px] text-faint transition-colors group-hover:text-ink">Read →</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="for-developers" className="mt-14 rounded-[20px] bg-ink p-5 sm:p-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="for-developers" className="mono text-[10.5px] uppercase tracking-[0.08em] text-faint">
+              For developers
+            </h2>
+            <p className="mt-2 max-w-[520px] text-[20px] font-semibold tracking-[-0.02em] text-white">Read the verdicts, protect your users, or run your own.</p>
+          </div>
+          <span className="mono text-[11px] text-faint">MIT · verified contracts · no API key</span>
+        </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {dev.map((t) => (
+            <Link key={t.slug} href={href(t)} className="group flex flex-col rounded-[14px] border border-white/10 bg-white/[0.04] p-5 transition hover:-translate-y-0.5 hover:border-white/30">
+              <span className="mono text-[10px] uppercase tracking-[0.08em] text-faint">{num(t)}</span>
+              <h3 className="mt-4 text-[16px] font-semibold tracking-[-0.015em] text-white">{t.title}</h3>
+              <p className="mt-1.5 text-[12.5px] leading-snug text-consider">{t.blurb}</p>
+              <span className="mono mt-auto pt-4 text-[11px] text-faint transition-colors group-hover:text-white">Read →</span>
             </Link>
           ))}
         </div>

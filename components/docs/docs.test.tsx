@@ -6,7 +6,10 @@ const nav = vi.hoisted(() => ({ notFound: vi.fn(() => { throw new Error('NEXT_NO
 vi.mock('next/navigation', () => ({ notFound: nav.notFound }));
 
 import { DOC_TOPICS } from './topics';
-import { API_ROUTES, CHECK_EVERY, GUARDIAN, RESOLVE_WINDOW, SAMPLE_WINDOW } from './articles';
+import { readFileSync } from 'node:fs';
+import { API_ROUTES, CHECK_EVERY, DEV_GUIDE_URL, GUARDIAN, GUARDIAN_RULE_LIMITS, INDEXED_ENTITIES, ORACLE_GRADING, RESOLVE_WINDOW, SAMPLE_WINDOW } from './articles';
+import { NETWORKS, NETWORK_IDS } from '@/shared/networks';
+import { addressUrl } from '@/components/tx/explorer';
 import { ALARM_MS, RESOLVE_WINDOW_S, SAMPLE_WINDOW_S } from '@/backend/src/cadence';
 import { FRESHNESS_MINUTES, MAX_CONFIDENCE_PCT, MIN_CONFIDENCE_PCT } from '@/components/advisor/ProtectStep';
 import { PUBLIC_ROUTES } from '@/backend/src/root';
@@ -28,7 +31,8 @@ describe('/app/docs', () => {
 
   test('covers every section the protocol needs', () => {
     expect(DOC_TOPICS.map((t) => t.slug)).toEqual([
-      'what-is-tare', 'explore', 'pulse', 'scan', 'advisor', 'watch', 'guardian', 'ledger', 'networks', 'api', 'risks',
+      'what-is-tare', 'explore', 'pulse', 'scan', 'advisor', 'watch', 'guardian', 'ledger', 'networks', 'risks',
+      'contracts', 'build-oracle', 'build-guardian', 'api', 'run-your-own',
     ]);
   });
 
@@ -100,6 +104,70 @@ describe('/app/docs', () => {
     expect(RESOLVE_WINDOW).toEqual({ testnet: hours(RESOLVE_WINDOW_S.testnet), mainnet: hours(RESOLVE_WINDOW_S.mainnet) });
     expect(SAMPLE_WINDOW).toEqual({ testnet: null, mainnet: hours(SAMPLE_WINDOW_S.mainnet) });
     expect(SAMPLE_WINDOW_S.testnet).toBe(0);
+  });
+
+  test('developer topics have their own hub section, apart from Every feature', () => {
+    render(<DocsHub />);
+    const dev = DOC_TOPICS.filter((t) => t.group === 'Developers');
+    expect(dev.map((t) => t.slug)).toEqual(['contracts', 'build-oracle', 'build-guardian', 'api', 'run-your-own']);
+    const devSection = screen.getByRole('region', { name: 'For developers' });
+    const features = screen.getByRole('region', { name: 'Every feature' });
+    for (const t of dev) {
+      expect(devSection.querySelector(`a[href="/app/docs/${t.slug}"]`), t.slug).toBeTruthy();
+      expect(features.querySelector(`a[href="/app/docs/${t.slug}"]`), t.slug).toBeNull();
+    }
+  });
+
+  test('Contracts page links every deployed address on both networks', async () => {
+    await topicPage('contracts');
+    for (const n of NETWORK_IDS) {
+      const c = NETWORKS[n];
+      const addrs = [c.oracle, c.guardian, ...c.vaults.map((v) => v.address), ...c.vaults.flatMap((v) => (v.adapter ? [v.adapter] : []))];
+      for (const a of addrs) expect(document.querySelector(`a[href="${addressUrl(a, n)}"]`), `${n} ${a}`).toBeTruthy();
+    }
+  });
+
+  test('grading numbers and Guardian limits match the Solidity source', () => {
+    const oracle = readFileSync('contracts/src/TareRiskOracle.sol', 'utf8');
+    const guardian = readFileSync('contracts/src/GuardianV2.sol', 'utf8');
+    const k = (src: string, name: string) => Number(new RegExp(`${name} = ([0-9_]+);`).exec(src)![1].replace(/_/g, ''));
+    expect(ORACLE_GRADING).toEqual({
+      ppsDropBps: k(oracle, 'PPS_DROP_BPS'), tvlDropBps: k(oracle, 'TVL_DROP_BPS'), liqFloorBps: k(oracle, 'LIQ_FLOOR_BPS'),
+      reasons: { pps: k(oracle, 'REASON_PPS'), tvl: k(oracle, 'REASON_TVL'), liq: k(oracle, 'REASON_LIQ'), broken: k(oracle, 'REASON_BROKEN') },
+    });
+    expect(GUARDIAN_RULE_LIMITS).toEqual({
+      minConfidenceBps: k(guardian, 'MIN_CONFIDENCE_BPS'), maxConfidenceBps: k(guardian, 'MAX_CONFIDENCE_BPS'),
+      minMaxAge: k(guardian, 'MIN_MAX_AGE'), maxMaxAge: k(guardian, 'MAX_MAX_AGE'),
+    });
+  });
+
+  test('the API page names every entity the indexer exposes', async () => {
+    const schema = readFileSync('indexer/schema.graphql', 'utf8');
+    const types = [...schema.matchAll(/^type (\w+) \{/gm)].map((m) => m[1]).filter((t) => t !== 'VaultState');
+    expect([...INDEXED_ENTITIES].sort()).toEqual(types.sort());
+    await topicPage('api');
+    for (const t of types) expect(document.body.textContent, t).toContain(t);
+  });
+
+  test('developer pages show their numbers and link the full reference', async () => {
+    await topicPage('build-oracle');
+    let text = document.body.textContent ?? '';
+    expect(text).toContain('latest(vault)');
+    expect(text).toContain('0.5%');
+    expect(text).toContain('REASON_BROKEN');
+    cleanup();
+    await topicPage('build-guardian');
+    text = document.body.textContent ?? '';
+    expect(text).toContain('8,000–9,900');
+    expect(text).toContain('60–3,600');
+    cleanup();
+    await topicPage('run-your-own');
+    expect(document.body.textContent).toContain('DeployV2.s.sol');
+    for (const slug of ['contracts', 'build-oracle', 'build-guardian', 'api', 'run-your-own']) {
+      cleanup();
+      await topicPage(slug);
+      expect(document.querySelector(`a[href^="${DEV_GUIDE_URL}"]`), slug).toBeTruthy();
+    }
   });
 
   test('an unknown topic is a 404', async () => {
