@@ -7,7 +7,7 @@ import { txUrl, shortHash } from '@/components/tx/explorer';
 import { ExitButton } from './PositionCard';
 import { exitErrorText, partialDetail, type FeedEvent } from './feed';
 
-const TONE: Record<string, string> = {
+export const TONE: Record<string, string> = {
   stats_changed: 'text-secondary',
   judged: 'text-ink',
   jev_unavailable: 'text-avoid',
@@ -18,7 +18,7 @@ const TONE: Record<string, string> = {
   exit_partial: 'text-avoid',
   exit_failed: 'text-avoid',
 };
-const TITLE: Record<string, string> = {
+export const TITLE: Record<string, string> = {
   stats_changed: 'Vault stats changed',
   judged: 'Re-checked',
   jev_unavailable: 'Judge unreachable',

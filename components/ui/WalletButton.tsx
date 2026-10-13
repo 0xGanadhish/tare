@@ -1,28 +1,25 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { injected, useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
+import { useCallback, useRef, useState } from 'react';
+import { injected, useAccount, useConnect, useSwitchChain } from 'wagmi';
 import { Button } from './Button';
 import { shortHash } from '@/components/tx/explorer';
 import { networkLabel, useNetwork } from '@/components/network/NetworkProvider';
+import { WalletPane } from '@/components/wallet/WalletPane';
 
-/** Injected-wallet connect + "switch to Monad {network}" prompt for the selected network. */
+/** Injected-wallet connect + "switch to Monad {network}" prompt for the selected network; the connected address opens the wallet pane. */
 export function WalletButton() {
   const { address, isConnected, isConnecting, chainId } = useAccount();
   const { network, config } = useNetwork();
   const { connect, error: connectError } = useConnect();
-  const { disconnect } = useDisconnect();
   const { switchChain, isPending: switching } = useSwitchChain();
   const [open, setOpen] = useState(false);
   const [noWallet, setNoWallet] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+  const trigger = useRef<HTMLSpanElement>(null);
+  // Safari does not focus a clicked button, so hand focus back to the trigger explicitly.
+  const closePane = useCallback(() => {
+    setOpen(false);
+    trigger.current?.querySelector('button')?.focus();
   }, []);
 
   if (!isConnected || !address) {
@@ -60,35 +57,14 @@ export function WalletButton() {
   }
 
   return (
-    <div ref={ref} className="relative">
-      <Button size="sm" variant="secondary" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span className="size-1.5 rounded-full bg-deposit" aria-hidden />
-        <span className="mono">{shortHash(address, 6, 4)}</span>
-      </Button>
-      {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-44 rounded-xl border border-hairline bg-paper p-1.5 shadow-[0_12px_32px_-16px_rgba(32,0,82,0.3)]">
-          <button
-            type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-[12.5px] text-secondary hover:bg-bg hover:text-ink"
-            onClick={() => {
-              navigator.clipboard?.writeText(address).catch(() => {});
-              setOpen(false);
-            }}
-          >
-            Copy address
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-[12.5px] text-secondary hover:bg-bg hover:text-ink"
-            onClick={() => {
-              disconnect();
-              setOpen(false);
-            }}
-          >
-            Disconnect
-          </button>
-        </div>
-      )}
-    </div>
+    <>
+      <span ref={trigger} className="contents">
+        <Button size="sm" variant="secondary" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
+          <span className="size-1.5 rounded-full bg-deposit" aria-hidden />
+          <span className="mono">{shortHash(address, 6, 4)}</span>
+        </Button>
+      </span>
+      <WalletPane address={address} open={open} onClose={closePane} />
+    </>
   );
 }
