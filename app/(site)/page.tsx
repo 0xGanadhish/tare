@@ -1,4 +1,4 @@
-import { readPools, readVerdicts } from '@/shared/cache';
+import { readLandingMarket } from '@/lib/api';
 import { FieldChart } from '@/components/field/FieldChart';
 import { fieldStats, formatTvl, pickAnnotations } from '@/components/field/format';
 import { VERDICT_COLORS } from '@/components/field/scales';
@@ -6,12 +6,18 @@ import { SiteNav } from '@/components/site/SiteNav';
 import { ScanInput } from '@/components/site/ScanInput';
 import { Steps } from '@/components/site/Steps';
 import { LaunchTeaser } from '@/components/site/LaunchTeaser';
+import { MainnetStrip } from '@/components/site/MainnetStrip';
 import { SiteFooter } from '@/components/site/SiteFooter';
 
 export const dynamic = 'force-dynamic';
 
+const stamp = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getUTCDate()} ${d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })} ${d.toISOString().slice(11, 16)} UTC`;
+};
+
 export default async function Landing() {
-  const [{ pools, asOf }, verdicts] = await Promise.all([readPools(), readVerdicts()]);
+  const { pools, verdicts, asOf, live } = await readLandingMarket();
   const stats = fieldStats(pools);
   const annotate = pickAnnotations(pools, verdicts);
 
@@ -21,7 +27,7 @@ export default async function Landing() {
 
       <header className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-5 pt-6 sm:px-9 sm:pt-8 lg:flex-row lg:items-end lg:justify-between">
         <h1 className="display max-w-[520px] text-[34px] sm:text-[44px]">
-          Every yield on Monad, weighed. <span className="text-soft">Know which ones are real before you deposit.</span>
+          Every yield on Monad, weighed. <span className="text-soft">A public, graded risk feed, and a Guardian that acts on it.</span>
         </h1>
         <ScanInput />
       </header>
@@ -51,10 +57,11 @@ export default async function Landing() {
           </div>
         </div>
         <p className="mono mt-1 hidden px-2 text-[10px] text-faint sm:block sm:px-0">
-          Data as of {new Date(asOf).toISOString().slice(11, 16)} UTC · hover a dot to see Jev&apos;s verdict
+          {live ? `Data as of ${stamp(asOf)}` : `Snapshot from ${stamp(asOf)}, live feed unavailable`} · hover a dot to see Jev&apos;s verdict
         </p>
       </section>
 
+      <MainnetStrip pools={pools} />
       <Steps />
       <LaunchTeaser />
       <SiteFooter />

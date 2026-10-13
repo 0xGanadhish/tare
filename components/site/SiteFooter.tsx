@@ -9,7 +9,7 @@ export function SiteFooter() {
           <span>Every yield on Monad, weighed.</span>
         </div>
         <div className="mono text-[10.5px] leading-relaxed">
-          Real data from DeFiLlama · Judgments by Jev (TypeSafe) · Transactions on Monad testnet
+          Real data from DeFiLlama · Judgments by Jev (TypeSafe) · Verdicts and exits on Monad mainnet and testnet
         </div>
       </div>
     </footer>
