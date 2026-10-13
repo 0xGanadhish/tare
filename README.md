@@ -75,7 +75,7 @@ A mainnet vault is watched only if it passes all five rules: its asset is USDC; 
 | Clearstar Earn USDC | Euler Earn | [`0xE1BcA19baA63894D374578320551633320436523`](https://monadvision.com/address/0xE1BcA19baA63894D374578320551633320436523) |
 | August USDC V2 | Morpho Vault V2 | [`0x80017bF0f793EBbE9679Cd61ff0e395B62CAbB59`](https://monadvision.com/address/0x80017bF0f793EBbE9679Cd61ff0e395B62CAbB59) |
 
-Left out on purpose: Hyperithm USDC Apex (3.7% withdrawable, under the 5% floor, so every HOLD would grade adverse) and Saturn USDC (about $9 of idle cash and no liquidity market, so Guardian couldn't get anyone out). The in-app Docs tab explains both.
+Left out on purpose: Hyperithm USDC Apex (3.7% withdrawable, under the 5% floor, so every HOLD would grade adverse) and Saturn USDC (no idle cash and no liquidity market, so Guardian couldn't get anyone out). The in-app Docs tab explains both.
 
 ## Contracts
 
@@ -176,8 +176,8 @@ Drop `--broadcast` for a dry run. On mainnet the script checks each vault's adap
 ## Tests
 
 ```bash
-pnpm test                          # app and shared (294)
-pnpm -C backend test               # Cloudflare Worker, in workerd (110)
+pnpm test                          # app and shared (335)
+pnpm -C backend test               # Cloudflare Worker, in workerd (116)
 pnpm -C indexer test               # simulated events (15)
 cd contracts && forge test         # unit and fuzz (114), plus 7 mainnet fork tests with --fork-url https://rpc.monad.xyz
 ```
@@ -186,7 +186,7 @@ cd contracts && forge test         # unit and fuzz (114), plus 7 mainnet fork te
 
 - **3rd place at Monad Blitz Pune V3** (10 Oct 2026), built solo in a day. That build is the foundation listed below.
 - The testnet ledger has been posting and grading verdicts around the clock since 11 Oct, from Cloudflare rather than a laptop.
-- Mainnet since 13 Oct: two real USDC vaults (about $14M TVL) watched, every verdict posted onchain, and every one graded 24 hours later on the [mainnet Ledger](https://tarefi.xyz/app/ledger?network=mainnet).
+- Mainnet since 13 Oct: two real USDC vaults (about $14.8M TVL) watched, every verdict posted onchain, and every one graded 24 hours later on the [mainnet Ledger](https://tarefi.xyz/app/ledger?network=mainnet).
 
 ## Business model
 
