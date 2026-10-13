@@ -1,0 +1,47 @@
+name = "tare-backend"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+# Public API at api.tarefi.xyz; the workers.dev URL stays on so nothing breaks while clients move over.
+workers_dev = true
+routes = [{ pattern = "api.tarefi.xyz", custom_domain = true }]
+
+[observability]
+enabled = true
+
+[triggers]
+# Pool scan every 10 min; resolver every minute (see CRON_* in src/index.ts).
+crons = ["*/10 * * * *", "* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tare"
+database_id = "8f2152d3-a58e-42ba-a344-5be68845aaf0"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "STATE"
+bucket_name = "tare-ledger"
+
+[[queues.producers]]
+binding = "EXITS"
+queue = "tare-exits"
+
+[[queues.consumers]]
+queue = "tare-exits"
+max_batch_size = 10
+# Retries also carry duplicates waiting out a live claim (130 s) and pending receipts; the consumer acks its own failures after 3 attempts.
+max_retries = 6
+dead_letter_queue = "tare-exits-dlq"
+
+[[durable_objects.bindings]]
+name = "VAULT_WATCHER"
+class_name = "VaultWatcher"
+
+[[durable_objects.bindings]]
+name = "TX_SENDER"
+class_name = "TxSender"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["VaultWatcher", "TxSender"]

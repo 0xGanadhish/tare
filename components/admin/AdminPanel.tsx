@@ -11,8 +11,8 @@ import { HowJevDecides } from '@/components/admin/HowJevDecides';
 
 /** One-click scenarios for the demo. Stress clears Jev's exit bar (94–95% in testing) and leaves enough liquidity to get fully out. */
 const SCENARIOS = [
-  { label: 'Calm', apy: 650, util: 7100, note: 'Normal market. Jev should hold.' },
-  { label: 'Stress', apy: 50, util: 9500, note: 'Yield collapses, liquidity dries up. Jev should exit.' },
+  { label: 'Calm', apy: 650, util: 7100, note: 'Normal market. Expect a HOLD verdict.' },
+  { label: 'Stress', apy: 50, util: 9500, note: 'Yield collapses, liquidity dries up. Expect an EXIT verdict.' },
   { label: 'Locked', apy: 50, util: 10000, note: 'Nothing can be withdrawn. Anyone still in is stuck.' },
 ] as const;
 
@@ -36,7 +36,7 @@ export function AdminPanel() {
     <div>
       <h1 className="display text-[30px] sm:text-[38px]">Demo controls</h1>
       <p className="mt-1 max-w-[680px] text-[14px] leading-relaxed text-secondary">
-        Each card is a testnet mirror of a real Monad vault. Here you play the market: push a vault into trouble and watch Jev and the Guardian react on{' '}
+        Each card is a testnet mirror of a real Monad vault. Here you play the market: push a vault into trouble and watch Tare and Guardian react on{' '}
         <a href="/app/watch" className="text-ink underline decoration-hairline underline-offset-4">Watch</a>. How it decides is{' '}
         <a href="#how" className="text-ink underline decoration-hairline underline-offset-4">explained below</a>.
       </p>

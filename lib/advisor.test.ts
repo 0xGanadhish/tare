@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { advise } from './advisor';
+import { advise, covered } from './advisor';
 import fixture from '../fixtures/pools.json';
 import type { Intent, Pool, Verdict } from '../shared/types';
 const base = fixture.pools[1] as Pool;
@@ -55,4 +55,20 @@ test('NOT_JUDGED ranks by real APY without pretending risk was assessed', () => 
   expect(results.map((r) => r.pool.id)).toEqual(['higher', 'lower']);
   expect(results[0].verdict).toMatchObject({ label: 'NOT_JUDGED', risk: null, confidence: 0 });
   expect(results[0].fitReasons).toContain('Risk not assessed — Jev unavailable; review before depositing');
+});
+
+test('covered lists Tare vaults on the network that the top 3 left out, even above the risk limit, but never AVOID', () => {
+  const pools = ['a', 'b', 'c', 'clearstar', 'august', 'avoided', 'elsewhere'].map((id) => pool(id, { realApy: id.length }));
+  const v = verdicts(pools);
+  v.clearstar.risk = 2.23; v.clearstar.label = 'CONSIDER'; v.avoided.label = 'AVOID';
+  const top = advise(intent, pools, v, []);
+  const result = covered(intent, pools, v, [], ['clearstar', 'august', 'avoided', 'a'], top.map((r) => r.pool.id));
+  expect(top.map((r) => r.pool.id)).toEqual(['elsewhere', 'august', 'a']);
+  expect(result.map((r) => r.pool.id)).toEqual(['clearstar']);
+  expect(result[0].expectedReturnUsd).toBeCloseTo(500 * 9 / 100 * 90 / 365);
+});
+test('covered respects the asset preference and the horizon', () => {
+  const pools = [pool('stable'), pool('gold', { assetClass: 'gold' }), pool('late', { maturity: '2027-04-10' })];
+  const result = covered({ ...intent, assetPref: { value: 'stable', confidence: 1 } }, pools, verdicts(pools), [], ['stable', 'gold', 'late'], []);
+  expect(result.map((r) => r.pool.id)).toEqual(['stable']);
 });

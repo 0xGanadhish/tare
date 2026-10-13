@@ -37,7 +37,7 @@ export default function ExplorePage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="display text-[30px] sm:text-[38px]">Explore</h1>
-          <p className="mt-1 text-[14px] text-secondary">Every pool, weighed by Jev. Click a dot or a row for the verdict slip.</p>
+          <p className="mt-1 text-[14px] text-secondary">Every Monad pool, each with a verdict. Click a dot or a row for the verdict slip.</p>
         </div>
         <span className="mono text-[11px] uppercase tracking-[0.06em] text-muted">data as of {data ? asOfLabel(data.asOf) : '–'}</span>
       </div>

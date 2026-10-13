@@ -3,7 +3,7 @@
 
 import json, subprocess, sys, urllib.request, os
 chain = int(sys.argv[1]); run = sys.argv[2]; out_dir = sys.argv[3]
-SRC = {'MockToken':'src/MockToken.sol','MirrorVault':'src/MirrorVault.sol','Guardian':'src/Guardian.sol','LaunchFactory':'src/LaunchFactory.sol','CurveToken':'src/CurveToken.sol'}
+SRC = {'MockToken':'src/MockToken.sol','MirrorVault':'src/MirrorVault.sol','Guardian':'src/Guardian.sol','LaunchFactory':'src/LaunchFactory.sol','CurveToken':'src/CurveToken.sol','TareRiskOracle':'src/TareRiskOracle.sol','GuardianV2':'src/GuardianV2.sol','MirrorAdapter':'src/adapters/MirrorAdapter.sol','EulerAdapter':'src/adapters/EulerAdapter.sol'}
 txs = [t for t in json.load(open(run))['transactions'] if t['transactionType'] == 'CREATE']
 for t in txs:
     name, addr = t['contractName'], t['contractAddress']

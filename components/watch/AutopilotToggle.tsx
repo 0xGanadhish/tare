@@ -1,50 +1,50 @@
 'use client';
 
-import { useAccount, useReadContract, useWriteContract } from 'wagmi';
-import { maxUint256 } from 'viem';
-import { monadTestnet } from '@/shared/chains';
-import { abis, addresses } from '@/shared/contracts';
+import { useState } from 'react';
+import { useWriteContract } from 'wagmi';
+import { abis } from '@/shared/contracts';
+import { UNDEPLOYED } from '@/shared/networks';
+import type { PositionV2 } from '@/lib/positions';
 import { TxButton } from '@/components/tx/TxButton';
+import { Button } from '@/components/ui/Button';
+import { ProtectStep } from '@/components/advisor/ProtectStep';
+import { useNetwork } from '@/components/network/NetworkProvider';
 
-/** ON = share `approve(guardian, max)` then `Guardian.enable(vault)`; OFF = `disable(vault)`. All user-signed. */
-export function AutopilotToggle({ vault, enabled }: { vault: `0x${string}`; enabled: boolean }) {
-  const { address } = useAccount();
+/** Guardian rule controls: ON opens ProtectStep (approve shares + enable rule); OFF calls GuardianV2.disable. All user-signed. */
+export function AutopilotToggle({ vault, rule, liveExit }: { vault: `0x${string}`; rule: PositionV2['rule']; liveExit?: boolean }) {
+  const { config } = useNetwork();
   const { writeContractAsync } = useWriteContract();
-  const guardian = addresses.guardian;
-  const allowance = useReadContract({
-    address: vault,
-    abi: abis.mirrorVault,
-    functionName: 'allowance',
-    args: address && guardian ? [address, guardian] : undefined,
-    chainId: monadTestnet.id,
-    query: { enabled: Boolean(address && guardian) },
-  });
-  if (!guardian) return <p className="mono text-[11.5px] text-muted">Autopilot is unavailable: Guardian is not deployed.</p>;
+  const [editing, setEditing] = useState(false);
+  if (config.guardian === UNDEPLOYED) return <p className="mono text-[11.5px] text-muted">Guardian is not deployed on this network yet.</p>;
 
-  const common = { chainId: monadTestnet.id } as const;
-  if (enabled) {
+  if (editing) {
     return (
-      <TxButton
-        label="Turn autopilot off"
-        variant="secondary"
-        run={() => writeContractAsync({ ...common, address: guardian, abi: abis.guardian, functionName: 'disable', args: [vault] })}
-      />
+      <div>
+        <ProtectStep vault={vault} initial={rule?.enabled ? rule : undefined} liveExit={liveExit} onDone={() => setEditing(false)} />
+        <button type="button" onClick={() => setEditing(false)} className="mono mt-2 text-[11px] text-muted underline underline-offset-4">
+          Cancel
+        </button>
+      </div>
     );
   }
-  const approved = (allowance.data ?? 0n) >= maxUint256 / 2n;
+  if (rule?.enabled) {
+    return (
+      <div className="flex flex-wrap gap-3">
+        <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+          Edit rule
+        </Button>
+        <TxButton
+          label="Turn Guardian off"
+          variant="secondary"
+          size="sm"
+          run={() => writeContractAsync({ chainId: config.chain.id, address: config.guardian, abi: abis.guardianV2, functionName: 'disable', args: [vault] })}
+        />
+      </div>
+    );
+  }
   return (
-    <div className="space-y-3">
-      <TxButton
-        label="1 · Allow Guardian to exit"
-        variant="secondary"
-        disabled={approved}
-        run={() => writeContractAsync({ ...common, address: vault, abi: abis.mirrorVault, functionName: 'approve', args: [guardian, maxUint256] })}
-      />
-      <TxButton
-        label="2 · Turn autopilot on"
-        disabled={!approved}
-        run={() => writeContractAsync({ ...common, address: guardian, abi: abis.guardian, functionName: 'enable', args: [vault] })}
-      />
-    </div>
+    <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+      Protect with Guardian
+    </Button>
   );
 }
