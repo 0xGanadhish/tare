@@ -36,3 +36,18 @@ describe('validateAmount', () => {
     expect(validateAmount('1.5', 2n * 10n ** 18n, 18)).toEqual({ ok: true, value: 15n * 10n ** 17n });
   });
 });
+
+describe('soft cap', () => {
+  const big = 10_000_000_000n; // 10,000 USDC
+  test('validateAmount returns over_soft_cap above $1,000 on mainnet', () => {
+    expect(validateAmount('1001', big, 6, { softCapUsd: 1000, alreadyDepositedUsd: 0 })).toMatchObject({ ok: false, code: 'over_soft_cap' });
+    expect(validateAmount('1000', big, 6, { softCapUsd: 1000, alreadyDepositedUsd: 0 })).toEqual({ ok: true, value: 1_000_000_000n });
+  });
+  test('counts what the wallet already deposited', () => {
+    expect(validateAmount('300', big, 6, { softCapUsd: 1000, alreadyDepositedUsd: 800 })).toMatchObject({ ok: false, code: 'over_soft_cap' });
+    expect(validateAmount('200', big, 6, { softCapUsd: 1000, alreadyDepositedUsd: 800 })).toMatchObject({ ok: true });
+  });
+  test('never on testnet (no cap)', () => {
+    expect(validateAmount('5000', big, 6, { softCapUsd: null, alreadyDepositedUsd: 0 })).toMatchObject({ ok: true });
+  });
+});

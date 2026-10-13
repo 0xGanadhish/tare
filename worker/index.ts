@@ -157,7 +157,7 @@ async function main() {
       }
       const position: Position = { vault, mirrorOf: info?.mirrorOf ?? vault, shares: shares.toString(), assets: assets.toString(),
         apyBps: stats.apyBps, utilBps: stats.utilBps, autopilot: owner !== null, judgment: null };
-      return judgePosition({ position, atDeposit, alternative: null });
+      return judgePosition({ position, atDeposit, alternative: null, protocolName: 'mirror', isMirror: true, flows: null, liquidityPct: null });
     },
     exit: sendExit,
     emit: async (e) => { log(e.type, e.message); await appendEvent(e); },

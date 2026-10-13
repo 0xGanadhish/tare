@@ -239,7 +239,7 @@ export function FieldChart({ pools, verdicts, annotate = [], onSelect, animate =
         ref={svgRef}
         viewBox={`0 0 ${w} ${h}`}
         role="img"
-        aria-label={`Field chart of ${pools.length} Monad pools by headline APY and TVL, coloured by Jev verdict`}
+        aria-label={`Field chart of ${pools.length} Monad pools by headline APY and TVL, coloured by verdict`}
         className={`block w-full select-none ${pre ? 'field-pre' : ''}`}
         style={{ height: 'auto', aspectRatio: `${w} / ${h}`, cursor: hover != null && onSelect ? 'pointer' : 'default' }}
         onPointerMove={(e) => setHover(nearest(e.clientX, e.clientY))}

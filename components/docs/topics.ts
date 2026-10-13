@@ -1,0 +1,41 @@
+/** The docs, in reading order. The hub, the sidebar and prev/next all read from this list. */
+export type DocGroup = 'Start here' | 'Find' | 'Decide' | 'Protect' | 'Reference' | 'Developers';
+
+export interface DocTopic {
+  slug: string;
+  title: string;
+  group: DocGroup;
+  /** One plain line for the hub card and the page lead. */
+  blurb: string;
+  /** The app tab this topic describes, if any. */
+  app?: { href: string; label: string };
+  /** Shown as "New" on the hub (Guardian v2 + Verdict Ledger work). */
+  isNew?: boolean;
+}
+
+export const DOC_GROUPS: DocGroup[] = ['Start here', 'Find', 'Decide', 'Protect', 'Reference', 'Developers'];
+
+export const DOC_TOPICS: DocTopic[] = [
+  { slug: 'what-is-tare', title: 'What is Tare', group: 'Start here', blurb: 'Weigh, choose, guard. The whole idea in one page.' },
+  { slug: 'explore', title: 'Explore', group: 'Find', blurb: 'Every Monad pool on one chart, each with a verdict.', app: { href: '/app/explore', label: 'Open Explore' } },
+  { slug: 'pulse', title: 'Pulse', group: 'Find', blurb: 'The whole market at a glance: real yield, where the money sits.', app: { href: '/app/pulse', label: 'Open Pulse' } },
+  { slug: 'scan', title: 'Idle scan', group: 'Find', blurb: 'Paste any wallet and see what is sitting idle.', app: { href: '/app/scan', label: 'Scan a wallet' } },
+  { slug: 'advisor', title: 'Advisor', group: 'Decide', blurb: 'Say what you want in plain words. Tare ranks the pools that fit.', app: { href: '/app/advisor', label: 'Ask the Advisor' } },
+  { slug: 'watch', title: 'Watch', group: 'Protect', blurb: 'Your positions, the latest verdict and a live feed of what happened.', app: { href: '/app/watch', label: 'Open Watch' } },
+  { slug: 'guardian', title: 'Guardian v2', group: 'Protect', blurb: 'An exit rule you set. Anyone can trigger it, only you get paid.', app: { href: '/app/watch', label: 'Set a rule on Watch' }, isNew: true },
+  { slug: 'ledger', title: 'Verdict Ledger', group: 'Protect', blurb: 'Every verdict, posted onchain and graded in public.', app: { href: '/app/ledger', label: 'Open the Ledger' }, isNew: true },
+  { slug: 'networks', title: 'Testnet and mainnet', group: 'Reference', blurb: 'What changes when you flip the switch in the header.' },
+  { slug: 'risks', title: 'Risks and disclosures', group: 'Reference', blurb: 'What can still go wrong, said plainly.' },
+  { slug: 'contracts', title: 'Contracts and addresses', group: 'Developers', blurb: 'Every deployed contract on both networks, verified, with explorer links.' },
+  { slug: 'build-oracle', title: 'Read the oracle', group: 'Developers', blurb: 'Read verdicts and grades from your own contract or app.' },
+  { slug: 'build-guardian', title: 'Protect your users', group: 'Developers', blurb: 'Add keeperless exits to any wallet or vault UI with GuardianV2.' },
+  { slug: 'api', title: 'Public API and indexer', group: 'Developers', blurb: 'The same data as JSON, or as GraphQL from the Envio indexer.' },
+  { slug: 'run-your-own', title: 'Run your own Tare', group: 'Developers', blurb: 'Deploy with your own judge and get graded by the same rules.' },
+];
+
+export const topicBySlug = (slug: string): DocTopic | undefined => DOC_TOPICS.find((t) => t.slug === slug);
+
+export function neighbours(slug: string): { prev: DocTopic | null; next: DocTopic | null } {
+  const i = DOC_TOPICS.findIndex((t) => t.slug === slug);
+  return { prev: DOC_TOPICS[i - 1] ?? null, next: i < 0 ? null : (DOC_TOPICS[i + 1] ?? null) };
+}

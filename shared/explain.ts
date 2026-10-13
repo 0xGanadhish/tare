@@ -34,16 +34,20 @@ const SOURCE: Record<NonNullable<Verdict['yieldSource']>, string> = {
   mixed: 'a mix of fees and token rewards',
 };
 
-/** Rewrites a verdict flag in plain words. Works on flags cached before this wording existed. */
-export function explainFlag(f: Verdict['flags'][number]): string {
+/**
+ * Rewrites a verdict flag in plain words. Works on flags cached before this wording existed.
+ * Pass `{ confidence: false }` where the verdict's own confidence is already on screen, so a card shows one "sure" figure.
+ */
+export function explainFlag(f: Verdict['flags'][number], opts: { confidence?: boolean } = {}): string {
+  const conf = opts.confidence !== false && f.confidence != null ? ` (${sure(f.confidence)})` : '';
   const num = Number(f.text.match(/(-?\d+(?:\.\d+)?)(?:\/5)?\s*$/)?.[1]);
   if (f.key === 'yield_source') {
     const src = (Object.keys(SOURCE) as (keyof typeof SOURCE)[]).find((k) => f.text.toLowerCase().includes(k));
-    return `Yield comes from ${src ? SOURCE[src] : 'an unknown source'}${f.confidence != null ? ` (${sure(f.confidence)})` : ''}.`;
+    return `Yield comes from ${src ? SOURCE[src] : 'an unknown source'}${conf}.`;
   }
   if (f.key === 'sustainable' && Number.isFinite(num)) return `Chance this APY lasts the next 30 days: ${pct(num)}.`;
   if (f.key === 'risk' && Number.isFinite(num)) {
-    return `Risk ${Number(num.toFixed(1))} out of 5, where 1 is safest${f.confidence != null ? ` (${sure(f.confidence)})` : ''}.`;
+    return `Risk ${Number(num.toFixed(1))} out of 5, where 1 is safest${conf}.`;
   }
   return f.text;
 }

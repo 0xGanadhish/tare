@@ -70,12 +70,12 @@ export function annotationLines(pool: Pool, verdict: Verdict | undefined): [stri
 }
 
 /**
- * Pick the pools the landing annotates: the biggest DEPOSIT with a real yield and the
- * AVOID pool with the loudest headline APY (ties → higher TVL).
+ * Pick the pools the landing annotates: the biggest DEPOSIT with a real yield of at least 1% (a dust yield
+ * would print as "0.0% · real yield") and the AVOID pool with the loudest headline APY (ties → higher TVL).
  */
 export function pickAnnotations(pools: Pool[], verdicts: Record<string, Verdict>): string[] {
   const deposit = pools
-    .filter((p) => verdicts[p.id]?.label === 'DEPOSIT' && p.realApy > 0 && p.apy <= 30)
+    .filter((p) => verdicts[p.id]?.label === 'DEPOSIT' && p.realApy >= 1 && p.apy <= 30)
     .sort((a, b) => b.tvlUsd - a.tvlUsd)[0];
   const avoid = pools
     .filter((p) => verdicts[p.id]?.label === 'AVOID' && p.apy <= 30)

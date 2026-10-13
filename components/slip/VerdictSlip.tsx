@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { Pool, Verdict, VerdictLabel } from '@/shared/types';
 import { poolDetailsUrl, protocolUrl } from '@/shared/protocols';
 import { explainFlag } from '@/shared/explain';
-import { formatConfidence, formatPct, formatPoolName, formatProject, formatTvl } from '@/components/field/format';
+import { formatPct, formatPoolName, formatProject, formatTvl } from '@/components/field/format';
 
 const STAMP: Record<VerdictLabel, { text: string; cls: string }> = {
   DEPOSIT: { text: 'DEPOSIT', cls: 'border-deposit text-deposit' },
@@ -38,7 +38,7 @@ export function VerdictSlip({ pool, verdict, history, action, tilt, className }:
     ['From incentives', `${Math.round(pool.incentiveShare * 100)}%`],
     ['Exit risk', exitRiskLabel(verdict)],
     ['TVL', formatTvl(pool.tvlUsd)],
-    ['Jev is', judged ? formatConfidence(verdict!.confidence) : '–'],
+    ['Confidence', judged ? `${Math.round(verdict!.confidence * 100)}%` : '–'],
   ];
   return (
     <article
@@ -51,6 +51,8 @@ export function VerdictSlip({ pool, verdict, history, action, tilt, className }:
         <span />
       </div>
       <h3 className="mt-1 max-w-[58%] text-[19px] font-semibold leading-tight tracking-[-0.02em]">{formatPoolName(pool)}</h3>
+      {/* Several pools can share a protocol and token (e.g. two Accountable AUSD vaults): name the variant, else its size. */}
+      <p className="mt-0.5 max-w-[58%] text-[12px] leading-snug text-secondary">{pool.meta ?? `${formatTvl(pool.tvlUsd)} pool`}</p>
       <div
         className={`mono absolute right-[18px] top-[34px] -rotate-[9deg] rounded-md border-[2.5px] px-2.5 py-[5px] text-[13px] font-semibold tracking-[0.14em] opacity-90 ${stamp.cls}`}
         aria-label={`Verdict: ${stamp.text}`}
@@ -80,13 +82,13 @@ export function VerdictSlip({ pool, verdict, history, action, tilt, className }:
             {verdict.flags.map((f, i) => (
               <li key={i} className="flex gap-2">
                 <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink/40" />
-                <span>{explainFlag(f)}</span>
+                <span>{explainFlag(f, { confidence: false })}</span>
               </li>
             ))}
           </ul>
         ) : (
           <p className="text-[12.5px] text-muted">
-            {judged ? 'No flags raised.' : 'Jev has not judged this pool. Real APY above is computed from the data; nothing is auto-executed.'}
+            {judged ? 'No flags raised.' : 'Not judged yet. Real APY above is computed from the data; nothing is auto-executed.'}
           </p>
         )}
       </div>

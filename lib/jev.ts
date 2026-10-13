@@ -6,6 +6,8 @@ export type JevAnswer =
   | { type: 'choice'; choice: string; confidence: number; probabilities: Record<string, number> }
   | { type: 'score'; score: number; confidence: number; legend: Record<string, string>; probabilities: Record<string, number> }
   | { type: 'noul'; noul: number };
+export const JEV_MODEL = 'jev-latest';
+
 export interface JevOptions { timeoutMs?: number; fetchImpl?: typeof fetch }
 
 export class JevUnavailable extends Error {
@@ -55,7 +57,7 @@ export async function jev(state: string, questions: Record<string, JevQuestion>,
     const request = async () => {
       const response = await (opts.fetchImpl ?? fetch)('https://api.typesafe.ai/v1/systemone', {
         method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'jev-latest', state, questions }), signal: controller.signal,
+        body: JSON.stringify({ model: JEV_MODEL, state, questions }), signal: controller.signal,
       });
       if (!response.ok) throw new JevUnavailable(`Jev HTTP ${response.status}`);
       const body: unknown = await response.json();

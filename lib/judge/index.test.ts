@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { judgePool, judgePosition, statsHash } from './index';
-import { JevUnavailable } from '../jev';
+import { judgePool, judgePosition, judgePositionDetailed, positionQuestions, statsHash } from './index';
+import { JEV_MODEL, JevUnavailable } from '../jev';
 import { renderPoolState, renderPositionState } from './state';
 import fixture from '../../fixtures/pools.json';
 import type { Pool, Position } from '../../shared/types';
 
 const pool = fixture.pools[1] as Pool;
 const position: Position = { vault: '0x123', mirrorOf: 'Clearstar USDC', shares: '500000000', assets: '500000000', apyBps: 90, utilBps: 9200, autopilot: true, judgment: null };
-const input = { position, atDeposit: { apyBps: 630, utilBps: 7100 }, alternative: { name: 'K3 USDC', realApy: 6.1 } };
+const input = { position, atDeposit: { apyBps: 630, utilBps: 7100 }, alternative: { name: 'K3 USDC', realApy: 6.1 },
+  protocolName: 'Euler', isMirror: true, flows: null, liquidityPct: null };
 const answers = {
   yield_source: { type: 'choice', choice: 'organic', confidence: 0.91, probabilities: { organic: 0.92, incentive: 0.02, mixed: 0.06 } },
   sustainable: { type: 'noul', noul: 0.7 },
@@ -75,4 +76,35 @@ test('position state matches the spec example: rounded amount, no vault address'
   const text = renderPositionState({ ...input, position: { ...position, vault: '0x7504b078d1f2b90fb9fcaf3d22753311013ea0ac', assets: '600003267' } });
   expect(text).toMatch(/^Holding 600 USDC in Clearstar USDC \(mirror\)\. APY at deposit 6\.3%, now 0\.9%\. Utilization 92% \(was 71%\)\./);
   expect(text).not.toContain('0x');
+});
+
+const realVault = { protocolName: 'Euler', isMirror: false, liquidityPct: 12.5,
+  flows: { netOutUsd: 1_200_000, netOutPctTvl: 8, largestOutUsd: 400_000 } };
+
+test('real-vault state drops "(mirror)" and reports flows and liquidity', () => {
+  const text = renderPositionState({ ...input, ...realVault, position: { ...position, mirrorOf: 'Clearstar USDC' } });
+  expect(text).not.toContain('(mirror)');
+  expect(text).toContain('Clearstar USDC (Euler)');
+  expect(text).toContain('net outflow');
+  expect(text).toContain('Withdrawable liquidity 12.5% of vault');
+});
+
+test('state says when flow data is unavailable', () => {
+  const text = renderPositionState({ ...input, ...realVault, flows: null });
+  expect(text).toContain('flow data unavailable');
+});
+
+test('judgePositionDetailed returns the exact state, questions, answers and model for archiving', async () => {
+  const answers = {
+    action: { type: 'choice', choice: 'hold', confidence: 0.9, probabilities: { hold: 0.9, exit: 0.05, rotate: 0.05 } },
+    withdrawal_risk: { type: 'noul', noul: 0.1 }, yield_collapse: { type: 'noul', noul: 0.2 },
+  };
+  const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ answers }));
+  const detailed = await judgePositionDetailed(input, { fetchImpl });
+  expect(detailed.state).toBe(renderPositionState(input));
+  expect(detailed.questions).toBe(positionQuestions);
+  expect(detailed.answers).toEqual(answers);
+  expect(detailed.model).toBe(JEV_MODEL);
+  expect(detailed.judgment).toMatchObject({ action: { value: 'hold' }, withdrawalRisk: 0.1, yieldCollapse: 0.2 });
+  expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body)).model).toBe(JEV_MODEL);
 });

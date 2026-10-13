@@ -1,10 +1,10 @@
 import { createConfig, http, injected } from 'wagmi';
-import { monadTestnet } from '@/shared/chains';
+import { monadMainnet, monadTestnet } from '@/shared/chains';
 
-/** Injected wallets only (MetaMask, Rabby, Phantom EVM…); every user transaction goes to Monad testnet. */
+/** Injected wallets only (MetaMask, Rabby, Phantom EVM…). Each tx names the selected network's chain (useNetwork). */
 export const wagmiConfig = createConfig({
-  chains: [monadTestnet],
+  chains: [monadTestnet, monadMainnet],
   connectors: [injected()],
-  transports: { [monadTestnet.id]: http() },
+  transports: { [monadTestnet.id]: http(), [monadMainnet.id]: http() },
   ssr: true,
 });
