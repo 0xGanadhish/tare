@@ -9,9 +9,9 @@ import type { SendRequest, SendResult } from '../src/txSender';
 
 const VAULT = '0x7504b078d1f2b90fb9fcaf3d22753311013ea0ac';
 
-async function seedPost(id: number, postedAt: number, resolved = 0, network: 'testnet' | 'mainnet' = 'testnet', sampled = 0) {
-  await env.DB.prepare(`INSERT INTO posts (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at, resolved, sampled)
-    VALUES (?, ?, ?, 1, 9000, 4000, '0x', ?, ?, ?)`).bind(network, id, VAULT, postedAt, resolved, sampled).run();
+async function seedPost(id: number, postedAt: number, resolved = 0, network: 'testnet' | 'mainnet' = 'testnet', sampled = 0, resampleAt: number | null = null) {
+  await env.DB.prepare(`INSERT INTO posts (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at, resolved, sampled, resample_at)
+    VALUES (?, ?, ?, 1, 9000, 4000, '0x', ?, ?, ?, ?)`).bind(network, id, VAULT, postedAt, resolved, sampled, resampleAt).run();
 }
 
 function resolvedLog(id: bigint, adverse: boolean, reasons: number) {
@@ -52,7 +52,7 @@ describe('resolver', () => {
     const result = await resolveDue(env, 'testnet', NOW, deps);
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ to: NETWORKS.testnet.oracle, kind: 'resolve' });
-    expect(result).toEqual({ sampled: 0, sent: 1, synced: 0, failed: 0 });
+    expect(result).toEqual({ sampled: 0, sent: 1, synced: 0, failed: 0, unsampled: 0 });
     expect(await rows()).toEqual([
       { id: 1, resolved: 1, adverse: 1, reasons: 5 },
       { id: 2, resolved: 0, adverse: null, reasons: null },
@@ -63,7 +63,7 @@ describe('resolver', () => {
   it('resolveDue syncs already-resolved posts without sending', async () => {
     await seedPost(1, NOW - RESOLVE_WINDOW_S.testnet - 1);
     const { deps, sent } = resolverDeps({ 1: { resolved: true, adverse: false, reasons: 0 } });
-    expect(await resolveDue(env, 'testnet', NOW, deps)).toEqual({ sampled: 0, sent: 0, synced: 1, failed: 0 });
+    expect(await resolveDue(env, 'testnet', NOW, deps)).toEqual({ sampled: 0, sent: 0, synced: 1, failed: 0, unsampled: 0 });
     expect(sent).toHaveLength(0);
     expect(await rows()).toEqual([{ id: 1, resolved: 1, adverse: 0, reasons: 0 }]);
   });
@@ -74,7 +74,7 @@ describe('resolver', () => {
     let calls = 0;
     const flaky: ResolverDeps = { ...deps, readResolution: async (n, id) => { if (calls++ === 0) throw new Error('rpc'); return deps.readResolution(n, id); } };
     const result = await resolveDue(env, 'testnet', NOW, flaky);
-    expect(result).toEqual({ sampled: 0, sent: 19, synced: 0, failed: 1 });
+    expect(result).toEqual({ sampled: 0, sent: 19, synced: 0, failed: 1, unsampled: 0 });
     const unresolved = (await rows()).filter((r) => r.resolved === 0).map((r) => r.id);
     expect(unresolved).toEqual([1, 21, 22]);
   });
@@ -94,23 +94,58 @@ describe('resolver: sampling (spec §2b)', () => {
 
   it('mainnet: samples a post once its window opens, and resolves only after sampling closes', async () => {
     await seedPost(1, NOW - RW - 10, 0, 'mainnet'); // sampling open
-    await seedPost(2, NOW - RW - SW - 1, 0, 'mainnet', 1); // sampling closed
+    await seedPost(2, NOW - RW - SW - 1, 0, 'mainnet', 2); // sampling closed
     await seedPost(3, NOW - RW + 60, 0, 'mainnet'); // still in the resolve window
     const { deps, sent } = resolverDeps();
     const result = await resolveDue(env, 'mainnet', NOW, deps);
     expect(sent.map((r) => [r.kind, fn(r).functionName, fn(r).args![0]])).toEqual([['sample', 'sample', 1n], ['resolve', 'resolve', 2n]]);
-    expect(result).toEqual({ sampled: 1, sent: 1, synced: 0, failed: 0 });
+    expect(result).toEqual({ sampled: 1, sent: 1, synced: 0, failed: 0, unsampled: 0 });
     expect(await sampledRows()).toEqual([
       { id: 1, sampled: 1, resolved: 0 },
-      { id: 2, sampled: 1, resolved: 1 },
+      { id: 2, sampled: 2, resolved: 1 },
       { id: 3, sampled: 0, resolved: 0 },
     ]);
   });
 
-  it('mainnet: a sampled post is not sampled again', async () => {
-    await seedPost(1, NOW - RW - 10, 0, 'mainnet', 1);
+  it('mainnet: the first sample schedules a second one at a random moment later in the window', async () => {
+    const opened = NOW - RW - 10;
+    await seedPost(1, opened, 0, 'mainnet');
+    const { deps } = resolverDeps();
+    await resolveDue(env, 'mainnet', NOW, { ...deps, random: () => 0.5 });
+    const row = await env.DB.prepare('SELECT sampled, resample_at FROM posts WHERE id = 1').first<{ sampled: number; resample_at: number }>();
+    expect(row!.sampled).toBe(1);
+    const close = opened + RW + SW;
+    expect(row!.resample_at).toBeGreaterThan(NOW + 60);
+    expect(row!.resample_at).toBeLessThan(close - 60);
+    const at = (r: number) => resolveDue(env, 'mainnet', NOW, { ...deps, random: () => r });
+    await env.DB.exec('UPDATE posts SET sampled = 0, resample_at = NULL');
+    await at(0);
+    const early = (await env.DB.prepare('SELECT resample_at FROM posts WHERE id = 1').first<{ resample_at: number }>())!.resample_at;
+    await env.DB.exec('UPDATE posts SET sampled = 0, resample_at = NULL');
+    await at(0.999);
+    const late = (await env.DB.prepare('SELECT resample_at FROM posts WHERE id = 1').first<{ resample_at: number }>())!.resample_at;
+    expect(early).toBeGreaterThanOrEqual(NOW + 5 * 60);
+    expect(late).toBeLessThanOrEqual(close - 5 * 60);
+  });
+
+  it('mainnet: the second sample goes out once it is due, and there is no third', async () => {
+    await seedPost(1, NOW - RW - 600, 0, 'mainnet', 1, NOW - 1); // due
+    await seedPost(2, NOW - RW - 600, 0, 'mainnet', 1, NOW + 300); // not yet
+    await seedPost(3, NOW - RW - 600, 0, 'mainnet', 2, NOW - 1); // both taken
     const { deps, sent } = resolverDeps();
-    expect(await resolveDue(env, 'mainnet', NOW, deps)).toEqual({ sampled: 0, sent: 0, synced: 0, failed: 0 });
+    expect(await resolveDue(env, 'mainnet', NOW, deps)).toEqual({ sampled: 1, sent: 0, synced: 0, failed: 0, unsampled: 0 });
+    expect(sent.map((r) => fn(r).args![0])).toEqual([1n]);
+    expect(await sampledRows()).toEqual([
+      { id: 1, sampled: 2, resolved: 0 },
+      { id: 2, sampled: 1, resolved: 0 },
+      { id: 3, sampled: 2, resolved: 0 },
+    ]);
+  });
+
+  it('mainnet: a sampled post is not sampled again before its second sample is due', async () => {
+    await seedPost(1, NOW - RW - 10, 0, 'mainnet', 1, NOW + 600);
+    const { deps, sent } = resolverDeps();
+    expect(await resolveDue(env, 'mainnet', NOW, deps)).toEqual({ sampled: 0, sent: 0, synced: 0, failed: 0, unsampled: 0 });
     expect(sent).toHaveLength(0);
   });
 
@@ -118,14 +153,14 @@ describe('resolver: sampling (spec §2b)', () => {
     await seedPost(1, NOW - RW - 10, 0, 'mainnet');
     const { deps } = resolverDeps();
     const reverting: ResolverDeps = { ...deps, sender: () => ({ send: async () => ({ hash: `0x${'ee'.repeat(32)}`, status: 'reverted', blockNumber: 1n, gasUsed: 1n, logs: [] }) }) };
-    expect(await resolveDue(env, 'mainnet', NOW, reverting)).toEqual({ sampled: 0, sent: 0, synced: 0, failed: 1 });
+    expect(await resolveDue(env, 'mainnet', NOW, reverting)).toEqual({ sampled: 0, sent: 0, synced: 0, failed: 1, unsampled: 0 });
     expect(await sampledRows()).toEqual([{ id: 1, sampled: 0, resolved: 0 }]);
   });
 
-  it('mainnet: a post nobody sampled still resolves after the window (the contract reads once)', async () => {
+  it('mainnet: a post nobody sampled still resolves after the window, and is counted as unsampled', async () => {
     await seedPost(1, NOW - RW - SW - 1, 0, 'mainnet');
     const { deps, sent } = resolverDeps();
-    expect(await resolveDue(env, 'mainnet', NOW, deps)).toEqual({ sampled: 0, sent: 1, synced: 0, failed: 0 });
+    expect(await resolveDue(env, 'mainnet', NOW, deps)).toEqual({ sampled: 0, sent: 1, synced: 0, failed: 0, unsampled: 1 });
     expect(fn(sent[0]).functionName).toBe('resolve');
   });
 

@@ -92,6 +92,7 @@ describe('/app/docs', () => {
     expect(text).toMatch(/worst/i);
     expect(text).toContain('sample');
     expect(text).toMatch(/flash loan/i);
+    expect(text).toMatch(/random moment/i); // the second, unannounced sample
   });
 
   test('grading windows in the docs match the resolver', () => {

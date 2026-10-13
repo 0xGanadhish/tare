@@ -420,8 +420,8 @@ function Ledger() {
         <p>Otherwise it is <Strong>clear</Strong>. Grading doesn&apos;t depend on Tare: the rules are in the contract.</p>
         <p>
           A reading can only make a grade harsher. Someone could borrow millions for a single transaction (a flash loan) to make a vault look healthy for one
-          reading, but the contract keeps the worst one, so one honest sample is enough. Tare&apos;s backend samples every verdict as soon as its window opens,
-          and anyone else can too.
+          reading, but the contract keeps the worst one. Tare&apos;s backend samples every verdict twice: as soon as its window opens, and again at a random
+          moment it doesn&apos;t announce, so faking a healthy vault would mean keeping the money in it for the whole window. Anyone else can sample too.
         </p>
       </Section>
       <Section id="score" title="The scoreboard">
