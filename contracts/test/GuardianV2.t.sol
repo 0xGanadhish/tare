@@ -65,7 +65,7 @@ contract GuardianV2Test is Test {
         vm.warp(1_000_000);
         usdc = new MockToken("Mock USDC", "USDC", 6);
         vault = new MirrorVault(usdc, "Mirror Vault", "mUSDC", unicode"Clearstar USDC · Euler", 0, 0, vaultAdmin);
-        oracle = new TareRiskOracle(oracleOwner, attester, 3600);
+        oracle = new TareRiskOracle(oracleOwner, attester, 3600, 0);
         guardian = new GuardianV2(admin, oracle);
         MirrorAdapter adapter = new MirrorAdapter();
         vm.prank(oracleOwner);

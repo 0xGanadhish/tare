@@ -38,7 +38,7 @@ contract DeployV2 is Script {
         vm.startBroadcast();
         address owner = vm.envOr("OWNER", msg.sender);
         require(owner == msg.sender, "OWNER must be the broadcaster");
-        TareRiskOracle oracle = new TareRiskOracle(owner, attester, mainnet ? 86_400 : 3_600);
+        TareRiskOracle oracle = new TareRiskOracle(owner, attester, mainnet ? 86_400 : 3_600, mainnet ? 3_600 : 0);
         GuardianV2 guardian = new GuardianV2(owner, oracle);
         AdapterKinds.Cache memory cache;
         address[] memory adapters = new address[](vaults.length);

@@ -65,7 +65,7 @@ contract OracleResolveTest is Test {
         usdc = new MockToken("Mock USDC", "USDC", 6);
         vault = new MirrorVault(usdc, "Mirror Vault", "mUSDC", unicode"Clearstar USDC · Euler", 0, 7100, admin);
         lossy = new LossyVault(usdc);
-        oracle = new TareRiskOracle(owner, attester, WINDOW);
+        oracle = new TareRiskOracle(owner, attester, WINDOW, 0);
         usdc.mint(user, 80_000e6);
         vm.startPrank(user);
         usdc.approve(address(vault), 40_000e6);
@@ -226,10 +226,10 @@ contract OracleResolveTest is Test {
 
     function test_constructor_rejectsZeroArgs() public {
         vm.expectRevert(TareRiskOracle.ZeroArg.selector);
-        new TareRiskOracle(address(0), attester, WINDOW);
+        new TareRiskOracle(address(0), attester, WINDOW, 0);
         vm.expectRevert(TareRiskOracle.ZeroArg.selector);
-        new TareRiskOracle(owner, address(0), WINDOW);
+        new TareRiskOracle(owner, address(0), WINDOW, 0);
         vm.expectRevert(TareRiskOracle.ZeroArg.selector);
-        new TareRiskOracle(owner, attester, 0);
+        new TareRiskOracle(owner, attester, 0, 0);
     }
 }

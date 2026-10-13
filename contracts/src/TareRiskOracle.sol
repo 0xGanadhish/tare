@@ -28,6 +28,15 @@ contract TareRiskOracle {
         uint256 liquidityAtPost;
     }
 
+    /// Worst values seen while sampling (spec §2b). `liquidityBps` is liquidity as bps of total assets, capped at 10,000.
+    struct Sample {
+        uint32 count;
+        bool broken;
+        uint16 liquidityBps;
+        uint256 pps;
+        uint256 assets;
+    }
+
     struct Resolution {
         bool resolved;
         bool adverse;
@@ -53,6 +62,8 @@ contract TareRiskOracle {
 
     address public immutable owner;
     uint64 public immutable resolveWindow;
+    /// After `resolveWindow`, how long anyone may `sample`; `resolve` waits for it to close. Zero: grade on one read at resolve.
+    uint64 public immutable sampleWindow;
     address public attester;
     uint256 public postCount;
 
@@ -61,6 +72,7 @@ contract TareRiskOracle {
     mapping(address vault => uint256) public latest;
     mapping(uint256 id => Post) internal _posts;
     mapping(uint256 id => Resolution) internal _resolutions;
+    mapping(uint256 id => Sample) internal _samples;
 
     error NotOwner();
     error NotAttester();
@@ -72,6 +84,8 @@ contract TareRiskOracle {
     error UnknownPost();
     error WindowOpen();
     error AlreadyResolved();
+    error SamplingOpen();
+    error SamplingClosed();
 
     event VerdictPosted(
         uint256 indexed id,
@@ -83,14 +97,16 @@ contract TareRiskOracle {
         uint64 postedAt
     );
     event VerdictResolved(uint256 indexed id, bool adverse, uint8 reasons);
+    event VerdictSampled(uint256 indexed id, bool broken, uint256 pps, uint256 assets, uint16 liquidityBps);
     event VaultRegistered(address indexed vault, address adapter);
     event AttesterChanged(address attester);
 
-    constructor(address owner_, address attester_, uint64 resolveWindow_) {
+    constructor(address owner_, address attester_, uint64 resolveWindow_, uint64 sampleWindow_) {
         if (owner_ == address(0) || attester_ == address(0) || resolveWindow_ == 0) revert ZeroArg();
         owner = owner_;
         attester = attester_;
         resolveWindow = resolveWindow_;
+        sampleWindow = sampleWindow_;
         emit AttesterChanged(attester_);
     }
 
@@ -141,32 +157,76 @@ contract TareRiskOracle {
         emit VerdictPosted(id, vault, verdict, confidenceBps, riskBps, stateHash, uint64(block.timestamp));
     }
 
-    /// @notice Grade a verdict once its window has passed, from onchain data only. Anyone can call it.
-    /// Adverse means the vault got worse for depositors: share price fell, assets fled, or liquidity dried up.
-    function resolve(uint256 id) external returns (bool adverse) {
-        if (id == 0 || id > postCount) revert UnknownPost();
-        Resolution storage r = _resolutions[id];
-        if (r.resolved) revert AlreadyResolved();
-        Post storage p = _posts[id];
-        if (block.timestamp < uint256(p.postedAt) + resolveWindow) revert WindowOpen();
+    /// @notice Record a reading of the vault while the post's sampling window is open. Anyone can call it.
+    /// Only the worst values are kept, so a reading taken inside a flash loan can make a grade harsher, never kinder.
+    function sample(uint256 id) external {
+        Post storage p = _gradable(id);
+        uint256 opens = uint256(p.postedAt) + resolveWindow;
+        if (block.timestamp < opens) revert WindowOpen();
+        if (block.timestamp >= opens + sampleWindow) revert SamplingClosed();
+        _sample(id, p.vault);
+    }
 
-        uint8 reasons;
-        try this.metricsOf(p.vault) returns (uint256 ppsNow, uint256 assetsNow, uint256 liqNow) {
-            if (ppsNow * MAX_BPS < p.ppsAtPost * (MAX_BPS - PPS_DROP_BPS)) reasons |= REASON_PPS;
-            if (assetsNow * MAX_BPS < p.assetsAtPost * (MAX_BPS - TVL_DROP_BPS)) reasons |= REASON_TVL;
-            if (
-                adapterOf[p.vault] != address(0)
-                    && liqNow < Math.mulDiv(assetsNow, LIQ_FLOOR_BPS, MAX_BPS, Math.Rounding.Ceil)
-            ) reasons |= REASON_LIQ;
-        } catch {
-            if (gasleft() < BROKEN_GAS_GUARD) revert InsufficientGas();
-            reasons = REASON_BROKEN;
+    /// @notice Grade a verdict once its windows have passed, from onchain data only. Anyone can call it.
+    /// Adverse means the vault got worse for depositors: share price fell, assets fled, or liquidity dried up.
+    /// It grades the worst sample; if nobody sampled, it takes one reading now.
+    function resolve(uint256 id) external returns (bool adverse) {
+        Post storage p = _gradable(id);
+        uint256 opens = uint256(p.postedAt) + resolveWindow;
+        if (block.timestamp < opens) revert WindowOpen();
+        if (block.timestamp < opens + sampleWindow) revert SamplingOpen();
+
+        Sample storage s = _samples[id];
+        if (s.count == 0 && !s.broken) _sample(id, p.vault);
+
+        uint8 reasons = s.broken ? REASON_BROKEN : 0;
+        if (s.count != 0) {
+            if (s.pps * MAX_BPS < p.ppsAtPost * (MAX_BPS - PPS_DROP_BPS)) reasons |= REASON_PPS;
+            if (s.assets * MAX_BPS < p.assetsAtPost * (MAX_BPS - TVL_DROP_BPS)) reasons |= REASON_TVL;
+            if (adapterOf[p.vault] != address(0) && s.liquidityBps < LIQ_FLOOR_BPS) reasons |= REASON_LIQ;
         }
 
         adverse = reasons != 0;
         _resolutions[id] =
             Resolution({resolved: true, adverse: adverse, reasons: reasons, resolvedAt: uint64(block.timestamp)});
         emit VerdictResolved(id, adverse, reasons);
+    }
+
+    function _gradable(uint256 id) internal view returns (Post storage) {
+        if (id == 0 || id > postCount) revert UnknownPost();
+        if (_resolutions[id].resolved) revert AlreadyResolved();
+        return _posts[id];
+    }
+
+    /// @dev One reading, folded into the worst values so far. A reverting read marks the sample broken for good.
+    function _sample(uint256 id, address vault) internal {
+        Sample storage s = _samples[id];
+        try this.metricsOf(vault) returns (uint256 pps, uint256 assets, uint256 liquidity) {
+            uint16 liqBps = _liquidityBps(liquidity, assets);
+            if (s.count == 0) {
+                (s.pps, s.assets, s.liquidityBps) = (pps, assets, liqBps);
+            } else {
+                if (pps < s.pps) s.pps = pps;
+                if (assets < s.assets) s.assets = assets;
+                if (liqBps < s.liquidityBps) s.liquidityBps = liqBps;
+            }
+            s.count++;
+            emit VerdictSampled(id, false, pps, assets, liqBps);
+        } catch {
+            if (gasleft() < BROKEN_GAS_GUARD) revert InsufficientGas();
+            s.broken = true;
+            emit VerdictSampled(id, true, 0, 0, 0);
+        }
+    }
+
+    /// @dev Liquidity as bps of total assets, capped at 10,000 (also for "no adapter" and an empty vault).
+    function _liquidityBps(uint256 liquidity, uint256 assets) internal pure returns (uint16) {
+        if (liquidity >= assets) return MAX_BPS;
+        return uint16(Math.mulDiv(liquidity, MAX_BPS, assets));
+    }
+
+    function getSample(uint256 id) external view returns (Sample memory) {
+        return _samples[id];
     }
 
     function getPost(uint256 id) external view returns (Post memory) {

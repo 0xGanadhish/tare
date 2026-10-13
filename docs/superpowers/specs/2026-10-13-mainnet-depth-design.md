@@ -73,6 +73,20 @@ Two stateless, view-only contracts implement the existing `ILiquidityAdapter.ava
 
 The Docs tab lists the selected vaults and the rules, and uses Saturn as the example of a vault Guardian can't protect.
 
+## 2b. Grading on the worst sample (security review, 2026-10-13)
+
+**Finding.** `resolve()` graded from one `metricsOf` read at call time. Anyone could wrap that call in a flash loan and change the reading. On a mainnet fork, flash-supplying 5M USDC to August's liquidity market moved the graded liquidity from 11% to 72% inside one `resolve`, for gas plus 1 USDC of rounding. User funds were never at risk, but the ledger's claim that grades can't be flattered was false.
+
+**Fix.** `TareRiskOracle` gets an immutable `sampleWindow` (mainnet 3,600 s; `0` keeps the old single reading at resolve time).
+- From `postedAt + resolveWindow` until `+ sampleWindow`, anyone may call `sample(id)`. Each call reads `metricsOf` and keeps the worst values seen: the lowest share price, the lowest total assets, and the lowest liquidity as bps of total assets (`liquidityBps`). A read that reverts sets a sticky `broken` flag (same 100k gas guard as before).
+- `resolve(id)` is allowed only after the sampling window. It grades on the worst values. If nobody sampled, it takes one reading itself (the old behaviour).
+- A flash loan lives inside one transaction, so it can only make its own sample look better, and the worst value ignores better samples. One honest sample caps the grade. Anyone can still make a grade harsher (for example by sampling during a large borrow); that direction can only hurt Tare's own record.
+- `VerdictSampled(id, broken, pps, assets, liquidityBps)` makes every reading public.
+
+**Scope.** Mainnet only (user decision, option A). Testnet keeps its current oracle: its mirror vaults are operator-controlled by design, so flash protection would protect nothing there. The backend resolver gets a per-network sampling window: it sends one `sample` as soon as a post's window opens and `resolve` once sampling closes. Mainnet verdicts are therefore graded at 25 hours.
+
+**Tests.** Unit: sampling only inside the window; `resolve` waits for it; the worst value sticks for share price, assets, liquidity and broken reads; fallback when nobody sampled. Fork: an honest sample on August, then a flash-boosted sample, leaves the stored worst values unchanged.
+
 ## 3. Deploy order
 
 **Script change (`contracts/script/DeployV2.s.sol`):**

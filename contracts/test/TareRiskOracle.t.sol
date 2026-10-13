@@ -33,7 +33,7 @@ contract TareRiskOracleTest is Test {
         usdc = new MockToken("Mock USDC", "USDC", 6);
         vault = new MirrorVault(usdc, "Mirror Vault", "mUSDC", unicode"Clearstar USDC · Euler", 600, 7100, admin);
         adapter = new MirrorAdapter();
-        oracle = new TareRiskOracle(owner, attester, 3600);
+        oracle = new TareRiskOracle(owner, attester, 3600, 0);
         usdc.mint(user, 40_000e6);
         vm.startPrank(user);
         usdc.approve(address(vault), 40_000e6);

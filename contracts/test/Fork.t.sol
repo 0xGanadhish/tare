@@ -8,6 +8,51 @@ import {TareRiskOracle} from "../src/TareRiskOracle.sol";
 import {GuardianV2} from "../src/GuardianV2.sol";
 import {ILiquidityAdapter} from "../src/interfaces/ILiquidityAdapter.sol";
 import {AdapterKinds} from "../script/AdapterKinds.sol";
+import {IMorphoMarketAdapter, IMorphoVaultV2} from "../src/adapters/MorphoV2Adapter.sol";
+
+struct MarketParams {
+    address loanToken;
+    address collateralToken;
+    address oracle;
+    address irm;
+    uint256 lltv;
+}
+
+interface IMorphoFlash {
+    function flashLoan(address token, uint256 assets, bytes calldata data) external;
+    function supply(MarketParams memory mp, uint256 assets, uint256 shares, address onBehalf, bytes memory data)
+        external
+        returns (uint256, uint256);
+    function withdraw(MarketParams memory mp, uint256 assets, uint256 shares, address onBehalf, address receiver)
+        external
+        returns (uint256, uint256);
+}
+
+/// The attack from the security review: flash-borrow USDC from Morpho, park it in the vault's liquidity market,
+/// take a reading, and take the money back, all in one transaction.
+contract FlashSampler {
+    TareRiskOracle immutable oracle;
+    IMorphoFlash immutable morpho;
+    IERC20 immutable usdc;
+    MarketParams mp;
+    uint256 id;
+
+    constructor(TareRiskOracle oracle_, IMorphoFlash morpho_, IERC20 usdc_, MarketParams memory mp_) {
+        (oracle, morpho, usdc, mp) = (oracle_, morpho_, usdc_, mp_);
+    }
+
+    function boostedSample(uint256 id_, uint256 amount) external {
+        id = id_;
+        morpho.flashLoan(address(usdc), amount, "");
+    }
+
+    function onMorphoFlashLoan(uint256 assets, bytes calldata) external {
+        usdc.approve(address(morpho), type(uint256).max);
+        (, uint256 shares) = morpho.supply(mp, assets, 0, address(this), "");
+        oracle.sample(id);
+        morpho.withdraw(mp, 0, shares, address(this), address(this));
+    }
+}
 
 /// Mainnet fork: the full Guardian v2 path against the real vaults in script/vaults.mainnet.json.
 /// Run: MONAD_MAINNET_RPC=https://rpc.monad.xyz forge test --match-path test/Fork.t.sol -vv
@@ -46,7 +91,7 @@ contract ForkTest is Test {
         internal
         returns (TareRiskOracle oracle, GuardianV2 guardian, address adapter)
     {
-        oracle = new TareRiskOracle(owner, attester, 86_400);
+        oracle = new TareRiskOracle(owner, attester, 86_400, 3_600); // mainnet's windows, as DeployV2 sets them
         guardian = new GuardianV2(owner, oracle);
         AdapterKinds.check(kind, vault);
         AdapterKinds.Cache memory cache;
@@ -151,8 +196,46 @@ contract ForkTest is Test {
             assertGt(p.ppsAtPost, 0, "pps snapshot");
             assertLe(p.liquidityAtPost, p.assetsAtPost, "liquidity <= assets");
             vm.warp(block.timestamp + 86_400);
+            oracle.sample(id);
+            assertEq(oracle.getSample(id).count, 1, "sampled");
+            vm.warp(block.timestamp + 3_600);
             oracle.resolve(id);
             assertTrue(oracle.getResolution(id).resolved);
+        }
+    }
+
+    /// Spec §2b: after one honest sample, a flash-boosted sample can't raise the worst values the grade uses.
+    function testFork_flashBoostedSample_cannotFlatter() public {
+        (address[] memory vaults, string[] memory kinds) = _vaults();
+        for (uint256 i = 0; i < vaults.length; i++) {
+            if (keccak256(bytes(kinds[i])) != keccak256("morpho-v2")) continue;
+            address vault = vaults[i];
+            address liqAdapter = IMorphoVaultV2(vault).liquidityAdapter();
+            if (liqAdapter == address(0)) continue;
+
+            TareRiskOracle oracle = new TareRiskOracle(owner, attester, 86_400, 3_600);
+            AdapterKinds.Cache memory cache;
+            address adapter = AdapterKinds.adapterFor(kinds[i], cache);
+            vm.prank(owner);
+            oracle.registerVault(vault, adapter);
+            vm.prank(attester);
+            uint256 id = oracle.post(vault, TareRiskOracle.Verdict.HOLD, 9000, 1000, keccak256("fork"));
+            vm.warp(block.timestamp + 86_400);
+
+            oracle.sample(id);
+            TareRiskOracle.Sample memory honest = oracle.getSample(id);
+
+            MarketParams memory mp = abi.decode(IMorphoVaultV2(vault).liquidityData(), (MarketParams));
+            IMorphoFlash morpho = IMorphoFlash(IMorphoMarketAdapter(liqAdapter).morpho());
+            FlashSampler attacker = new FlashSampler(oracle, morpho, IERC20(USDC), mp);
+            deal(USDC, address(attacker), 1e6); // covers Morpho's 1-wei rounding on the way out
+            attacker.boostedSample(id, 5_000_000e6);
+
+            TareRiskOracle.Sample memory after_ = oracle.getSample(id);
+            assertEq(after_.count, 2, "both readings recorded");
+            assertEq(after_.liquidityBps, honest.liquidityBps, "worst liquidity unchanged");
+            assertEq(after_.assets, honest.assets, "worst assets unchanged");
+            assertEq(after_.pps, honest.pps, "worst share price unchanged");
         }
     }
 }
