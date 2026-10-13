@@ -173,7 +173,7 @@ curl https://api.tarefi.xyz/v1/vaults/testnet/0x7504b078d1f2b90fb9fcaf3d22753311
 
 ## Envio indexer
 
-[`indexer/`](../indexer) indexes both networks into one GraphQL schema ([`schema.graphql`](../indexer/schema.graphql)). Ids are prefixed with the chain id (143 mainnet, 10143 testnet) and addresses are lowercase. Run it locally with `pnpm -C indexer dev` (GraphQL at `http://localhost:8080/v1/graphql`); the hosted endpoint the app uses is set in `NEXT_PUBLIC_ENVIO_URL`.
+[`indexer/`](../indexer) indexes both networks into one GraphQL schema ([`schema.graphql`](../indexer/schema.graphql)). Ids are prefixed with the chain id (143 mainnet, 10143 testnet) and addresses are lowercase. Run it locally with `pnpm -C indexer dev` (GraphQL at `http://localhost:8080/v1/graphql`). The hosted endpoint is set in the backend's `ENVIO_GRAPHQL_URL` secret; the app reads Envio data through the backend's public API, not directly.
 
 The latest graded verdicts on a vault:
 
