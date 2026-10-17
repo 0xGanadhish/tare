@@ -801,7 +801,7 @@ function RunYourOwn() {
           items={[
             { title: 'Deploy the contracts', body: <>Run <Code>contracts/script/DeployV2.s.sol</Code> with <Code>ATTESTER</Code> set to your posting key&apos;s address. On mainnet it checks each vault&apos;s adapter before registering it, and writes <Code>shared/addresses.&lt;network&gt;.json</Code>.</> },
             { title: 'Give the backend its keys', body: <>Set <Code>ATTESTER_KEY_*</Code> and <Code>EXECUTOR_KEY_*</Code> as Cloudflare secrets, one wallet per role per network, then <Code>wrangler deploy</Code> in <Code>backend/</Code>.</> },
-            { title: 'Swap the judge', body: <>Replace the Jev calls in <Code>lib/judge/index.ts</Code> with your model. The fixed rules in <Code>lib/judge/gating.ts</Code> still turn its answers into verdicts.</> },
+            { title: 'Swap the judge', body: <>Replace the Jev calls in <Code>lib/judge/index.ts</Code> with your model. <Code>shared/verdict.ts</Code> turns its hold, exit or move call into the oracle&apos;s verdict, confidence and risk, unchanged.</> },
             { title: 'Point the indexer at your addresses', body: <>Run <Code>pnpm -C indexer gen-config --strict</Code>, then deploy it.</> },
           ]}
         />

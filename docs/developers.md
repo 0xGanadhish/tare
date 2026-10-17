@@ -204,7 +204,7 @@ Other entities: `Protection` (each user's Guardian rule), `Exit`, and `LargeWith
 Everything is MIT. To run your own feed with your own judge:
 
 1. Deploy with `contracts/script/DeployV2.s.sol` and your own `ATTESTER` address (see the README).
-2. Point the backend's `ATTESTER_KEY_*` and `EXECUTOR_KEY_*` secrets at your keys, and replace the Jev calls in `lib/judge/index.ts` with your model. Fixed rules in `lib/judge/gating.ts` turn answers into verdicts.
+2. Point the backend's `ATTESTER_KEY_*` and `EXECUTOR_KEY_*` secrets at your keys, and replace the Jev calls in `lib/judge/index.ts` with your model. `toOraclePost` in `shared/verdict.ts` maps its hold, exit or move call to the oracle's verdict, confidence and risk, unchanged.
 3. Point the indexer at your addresses with `pnpm -C indexer gen-config --strict`.
 
 Your verdicts are graded by the same contract rules as Tare's, so two feeds can be compared on the same scorecard.
