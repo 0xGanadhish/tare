@@ -99,8 +99,12 @@ export async function watchOnce(db: D1Database, vault: VaultConfig, network: Net
   try {
     reading = await deps.readVault(network, vault);
     const flows = await deps.readFlows(network, vault, reading);
-    const hasPost = (await db.prepare('SELECT 1 FROM posts WHERE network = ? AND vault = ? LIMIT 1').bind(network, address.toLowerCase()).first()) !== null;
-    if (decide({ stats: reading.stats, last, flows, hasPost }) === 'skip') {
+    // Seconds since this vault's last real post (null = none yet); drills don't count, they are reset before grading.
+    // Newest first through posts_by_vault, so this reads one row instead of every post the vault has.
+    const lastPostAt = await db.prepare('SELECT posted_at FROM posts WHERE network = ? AND vault = ? AND drill = 0 ORDER BY id DESC LIMIT 1')
+      .bind(network, address.toLowerCase()).first<number>('posted_at');
+    const lastPostAgeS = lastPostAt === null ? null : Math.max(0, Math.floor(Date.now() / 1000) - lastPostAt);
+    if (decide({ stats: reading.stats, last, flows, lastPostAgeS }) === 'skip') {
       await health(null, null);
       return last;
     }

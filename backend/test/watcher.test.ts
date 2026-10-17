@@ -179,6 +179,24 @@ describe('VaultWatcher', () => {
     expect(calls.judged).toBe(1);
   });
 
+  it('watcher: one big withdrawal posts once, not on every tick while the hour of outflow lingers', async () => {
+    const vault = NETWORKS.testnet.vaults[0];
+    const { deps, calls } = fakeDeps({
+      readFlows: async () => ({ netOutUsd: 2_000_000, netOutPctTvl: 40, largestOutUsd: 2_000_000 }),
+      // A fresh post, like a real one, so the outflow cooldown has something to measure from.
+      post: async (...args) => {
+        calls.posts.push(args);
+        await env.DB.prepare(`INSERT INTO posts (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at) VALUES ('testnet', 8, ?, 1, 9200, 4000, '0x', ?)`)
+          .bind(vault.address.toLowerCase(), Math.floor(Date.now() / 1000)).run();
+        return { id: 8n, txHash: `0x${'88'.repeat(32)}` };
+      },
+    });
+    let last: VaultReading['stats'] | null = null;
+    for (let i = 0; i < 5; i++) last = await watchOnce(env.DB, vault, 'testnet', last, deps);
+    expect(calls.judged).toBe(1);
+    expect(calls.posts).toHaveLength(1);
+  });
+
   it('watcher: Jev down on two ticks warns each protected owner once', async () => {
     const { deps } = fakeDeps({ judge: async () => { throw new JevUnavailable('down'); } });
     const stub = await startWatcher(deps);
