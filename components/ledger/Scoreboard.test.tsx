@@ -60,7 +60,7 @@ describe('Scoreboard', () => {
     const text = note.textContent ?? '';
     expect(text).toMatch(/140/);
     expect(text).toMatch(/#16–#155/);
-    expect(text).toMatch(/Leaving them out, Jev was right 14 of 20 times/);
+    expect(text).toMatch(/Leaving them out, Jev was right 14 of 20 times \(70%\)/);
     expect(text).toMatch(/fixed/i);
     // Above the headline sentence, so it is read before the numbers.
     const sentence = screen.getByText('Jev was right 14 of 160 times.');

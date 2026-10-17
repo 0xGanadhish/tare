@@ -21,7 +21,7 @@ export function Scoreboard({ score, network }: { score: LedgerScore; network: Ne
         <p role="note" aria-label="About the 15 Oct verdicts" className="mt-3 rounded-xl border border-dashed border-hairline p-3 text-[12px] leading-relaxed text-secondary">
           <span className="font-medium text-ink">About the 15 Oct verdicts.</span> One $2M withdrawal from Clearstar set off a bug that re-posted
           the same EXIT every 30 seconds: 140 copies (#16–#155) of one call. The vault didn&apos;t fall further, so all 140 graded clear and pull
-          this score down. Leaving them out, Jev was right {right} of {graded - DUPLICATE_EXITS} times. Guardian still exited the protected position 10 seconds after
+          this score down. Leaving them out, Jev was right {right} of {graded - DUPLICATE_EXITS} times ({pct(right / (graded - DUPLICATE_EXITS))}). Guardian still exited the protected position 10 seconds after
           the first EXIT. The bug is fixed; the onchain record stays as posted.
         </p>
       )}
