@@ -2,7 +2,7 @@ import { createPublicClient, formatEther, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { NETWORKS, type Network } from '../../shared/networks';
 import { liveNetworks } from './crons';
-import { rpcFor, secretFor, type Env, type KeyRole } from './env';
+import { isPaused, rpcFor, secretFor, type Env, type KeyRole } from './env';
 import { json } from './http';
 import { HEARTBEAT_MS } from './watcher';
 
@@ -37,12 +37,13 @@ interface HealthRow { network: Network; vault: string; last_post_at: string | nu
 export async function handleHealth(env: Env, deps: HealthDeps = realHealthDeps(env)): Promise<Response> {
   const now = Date.now();
   const age = (iso: string | null) => (iso === null ? null : Math.round((now - Date.parse(iso)) / 1000));
-  const networks = deps.networks();
+  // A paused network's watchers are off on purpose, so its stale vaults and idle keys don't turn health red.
+  const networks = deps.networks().filter((n) => !isPaused(env, n));
   const [{ results }, backlog] = await Promise.all([
     env.DB.prepare('SELECT network, vault, last_post_at, last_error, updated_at FROM vault_health ORDER BY network, vault').all<HealthRow>(),
     env.DB.prepare(`SELECT COUNT(*) AS n FROM exits WHERE status IN ('sending', 'failed')`).first<number>('n'),
   ]);
-  const vaults = results.map((r) => ({ network: r.network, vault: r.vault, lastPostAgeS: age(r.last_post_at), lastTickAgeS: age(r.updated_at)!, lastError: r.last_error }));
+  const vaults = results.filter((r) => !isPaused(env, r.network)).map((r) => ({ network: r.network, vault: r.vault, lastPostAgeS: age(r.last_post_at), lastTickAgeS: age(r.updated_at)!, lastError: r.last_error }));
   const stale = vaults.some((v) => v.lastTickAgeS * 1000 > 3 * HEARTBEAT_MS[v.network]);
 
   let lowBalance = false;

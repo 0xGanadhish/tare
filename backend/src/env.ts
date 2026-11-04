@@ -19,7 +19,13 @@ export interface Env {
   EXECUTOR_KEY_MAINNET?: string;
   ADMIN_TOKEN?: string;
   ENVIO_GRAPHQL_URL?: string;
+  /** Comma-separated networks whose watchers stand down (wrangler.toml [vars]). Their data stays served. */
+  PAUSED_NETWORKS?: string;
 }
+
+/** True when PAUSED_NETWORKS lists this network: its watchers stop ticking and /health leaves it out. */
+export const isPaused = (env: Env, network: Network): boolean =>
+  (env.PAUSED_NETWORKS ?? '').split(',').map((s) => s.trim()).includes(network);
 
 export type KeyRole = 'attester' | 'executor';
 

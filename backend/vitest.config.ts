@@ -6,7 +6,7 @@ export default defineConfig({
     cloudflareTest(async () => ({
       wrangler: { configPath: './wrangler.toml' },
       miniflare: {
-        bindings: { TEST_MIGRATIONS: await readD1Migrations('./migrations'), ADMIN_TOKEN: 'test-admin-token' },
+        bindings: { TEST_MIGRATIONS: await readD1Migrations('./migrations'), ADMIN_TOKEN: 'test-admin-token', PAUSED_NETWORKS: '' },
       },
     })),
   ],
