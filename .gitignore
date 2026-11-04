@@ -54,3 +54,12 @@ contracts/broadcast/
 # playwright
 /test-results/
 /playwright-report/
+
+# Internal working docs stay local
+/.omp/
+/.claude/agents/
+/reports/
+/docs/plan.md
+/docs/spec.md
+/docs/briefs/
+/docs/superpowers/
