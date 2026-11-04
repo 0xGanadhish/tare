@@ -1,7 +1,7 @@
 import { isNetwork, type Network } from '../../shared/networks';
 import type { Env } from './env';
 import { error, json, preflight } from './http';
-import { scoreLedger } from '../../shared/score';
+import { newCalls, scoreLedger } from '../../shared/score';
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const MAX_LIMIT = 100;
@@ -73,11 +73,13 @@ async function events(env: Env, network: Network, owner: string, since: string |
 }
 
 async function score(env: Env, network: Network): Promise<Response> {
-  const { results } = await env.DB.prepare('SELECT verdict, confidence_bps, risk_bps, resolved, adverse FROM posts WHERE network = ? AND drill = 0')
-    .bind(network).all<Pick<PostRow, 'verdict' | 'confidence_bps' | 'risk_bps' | 'resolved' | 'adverse'>>();
-  return json(scoreLedger(results.map((r) => ({
-    verdict: VERDICT_NAMES[r.verdict], confidenceBps: r.confidence_bps, riskBps: r.risk_bps, resolved: r.resolved === 1, adverse: r.adverse === null ? null : r.adverse === 1,
-  }))));
+  const { results } = await env.DB.prepare('SELECT vault, verdict, confidence_bps, risk_bps, posted_at, resolved, adverse FROM posts WHERE network = ? AND drill = 0 ORDER BY id')
+    .bind(network).all<Pick<PostRow, 'vault' | 'verdict' | 'confidence_bps' | 'risk_bps' | 'posted_at' | 'resolved' | 'adverse'>>();
+  const { calls, repeats } = newCalls(results.map((r) => ({
+    vault: r.vault, postedAt: r.posted_at, verdict: VERDICT_NAMES[r.verdict], confidenceBps: r.confidence_bps, riskBps: r.risk_bps,
+    resolved: r.resolved === 1, adverse: r.adverse === null ? null : r.adverse === 1,
+  })));
+  return json(scoreLedger(calls, repeats));
 }
 
 /** Read-only public API (plan Task 8). Returns null for routes it does not own. */

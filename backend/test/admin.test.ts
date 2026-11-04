@@ -141,6 +141,15 @@ describe('health', () => {
     expect(body.balances).toEqual({ testnet: { attester: '1', executor: '1' } });
   });
 
+  it('health: a paused network is left out, so its stale vaults and keys stay out of the verdict', async () => {
+    await tick(3_600);
+    const res = await handleHealth({ ...env, PAUSED_NETWORKS: 'testnet' }, healthy);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ vaults: unknown[]; balances: Record<string, unknown> }>();
+    expect(body.vaults).toEqual([]);
+    expect(body.balances).toEqual({});
+  });
+
   it('health: stale vault → 503', async () => {
     await tick(91); // 3 × 30 s heartbeat = 90 s
     expect((await handleHealth(env, healthy)).status).toBe(503);

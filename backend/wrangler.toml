@@ -9,6 +9,11 @@ routes = [{ pattern = "api.tarefi.xyz", custom_domain = true }]
 [observability]
 enabled = true
 
+[vars]
+# Watchers on these networks stand down (comma-separated); their data stays served. Testnet paused 3 Nov after judging,
+# to keep Durable Object duration inside the plan. To resume: remove it, deploy, then POST /v1/admin/watchers/start.
+PAUSED_NETWORKS = "testnet"
+
 [triggers]
 # Pool scan every 10 min; resolver every minute (see CRON_* in src/index.ts).
 crons = ["*/10 * * * *", "* * * * *"]

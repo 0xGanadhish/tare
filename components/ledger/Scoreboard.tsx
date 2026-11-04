@@ -3,12 +3,13 @@ import type { Network } from '@/shared/networks';
 import { MIN_BAND_VERDICTS, scoreSummary, verdictCount } from './format';
 
 const pct = (x: number | null) => (x == null ? '–' : `${Math.round(x * 100)}%`);
-/** Mainnet verdicts #16–#155: one EXIT re-posted every 30 s on 15 Oct by the outflow-trigger bug. All graded clear, so all misses. */
+/** Mainnet verdicts #16–#155: one EXIT re-posted every 30 s on 15 Oct by the outflow-trigger bug. The score counts the first; the rest are repeats. */
 const DUPLICATE_EXITS = 140;
 
 /** Graded verdicts in one plain sentence, how often they were right by confidence band, and the Brier score on request (spec §7). */
 export function Scoreboard({ score, network }: { score: LedgerScore; network: Network }) {
   const { right, graded, sentence } = scoreSummary(score, network);
+  const repeats = score.repeats ?? 0;
   return (
     <section aria-label="Scoreboard" className="rounded-[14px] bg-paper p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -17,11 +18,11 @@ export function Scoreboard({ score, network }: { score: LedgerScore; network: Ne
           <span className="mono rounded-full border border-hairline px-2 py-0.5 text-[10px] uppercase tracking-[0.06em] text-secondary">Early data</span>
         )}
       </div>
-      {network === 'mainnet' && graded > DUPLICATE_EXITS && (
+      {network === 'mainnet' && repeats >= DUPLICATE_EXITS - 1 && (
         <p role="note" aria-label="About the 15 Oct verdicts" className="mt-3 rounded-xl border border-dashed border-hairline p-3 text-[12px] leading-relaxed text-secondary">
           <span className="font-medium text-ink">About the 15 Oct verdicts.</span> One $2M withdrawal from Clearstar set off a bug that re-posted
-          the same EXIT every 30 seconds: 140 copies (#16–#155) of one call. The vault didn&apos;t fall further, so all 140 graded clear and pull
-          this score down. Leaving them out, Jev was right {right} of {graded - DUPLICATE_EXITS} times ({pct(right / (graded - DUPLICATE_EXITS))}). Guardian still exited the protected position 10 seconds after
+          the same EXIT every 30 seconds: 140 copies (#16–#155) of one call. The vault didn&apos;t fall further, so the call graded clear. This
+          score counts it once, as one miss, and leaves out the other {DUPLICATE_EXITS - 1}. Guardian still exited the protected position 10 seconds after
           the first EXIT. The bug is fixed; the onchain record stays as posted.
         </p>
       )}
@@ -51,6 +52,9 @@ export function Scoreboard({ score, network }: { score: LedgerScore; network: Ne
             </dl>
           </div>
         </>
+      )}
+      {repeats > 0 && (
+        <p className="mt-3 text-[11px] text-muted">{repeats} repeat posts not counted (same call on the same vault within an hour)</p>
       )}
       {network === 'testnet' && (
         <p role="note" className="mt-4 rounded-xl border border-dashed border-hairline p-3 text-[12px] leading-relaxed text-secondary">

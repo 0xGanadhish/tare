@@ -15,6 +15,8 @@ const STALE_CLAIM_MS = 120_000;
 const IN_FLIGHT_DELAY_S = 130;
 /** Seconds before checking again on a tx that was broadcast but had no receipt yet. */
 const PENDING_DELAY_S = 30;
+/** Seconds before a partly-completed exit tries again for the shares still in the vault. */
+export const PARTIAL_FOLLOWUP_S = 30;
 /** Reverts that mean "nothing to do" (already out, opted out, verdict spent): skipped without a failure event. */
 const BENIGN = new Set(['NothingToExit', 'NotEnabled', 'VerdictAlreadyUsed']);
 const USDC_DECIMALS = 6;
@@ -25,6 +27,8 @@ export interface ExitDeps {
   sender(network: Network): Sender;
   /** Receipt of an earlier broadcast, or null if it hasn't landed. */
   receipt(network: Network, hash: Hex): Promise<Receipt | null>;
+  /** Enqueues the job again as a new message, so a follow-up doesn't spend the original's retries. */
+  requeue(job: ExitJob, delaySeconds: number): Promise<void>;
 }
 
 export function realExitDeps(env: Env): ExitDeps {
@@ -52,6 +56,7 @@ export function realExitDeps(env: Env): ExitDeps {
         throw err;
       }
     },
+    requeue: async (job, delaySeconds) => { await env.EXITS.send(job, { delaySeconds }); },
   };
 }
 
@@ -66,7 +71,7 @@ async function processJob(env: Env, job: ExitJob, attempts: number, deps: ExitDe
   const now = new Date();
   const claim = await env.DB.prepare(`INSERT INTO exits (network, verdict_id, owner, status, at) VALUES (?1, ?2, ?3, 'sending', ?4)
     ON CONFLICT (network, verdict_id, owner) DO UPDATE SET status = 'sending', error = NULL, at = ?4
-    WHERE exits.status = 'failed' OR (exits.status = 'sending' AND exits.at < ?5)`)
+    WHERE exits.status IN ('failed', 'partial') OR (exits.status = 'sending' AND exits.at < ?5)`)
     .bind(...key, now.toISOString(), new Date(now.getTime() - STALE_CLAIM_MS).toISOString()).run();
   const update = (fields: string, ...values: unknown[]) => env.DB.prepare(`UPDATE exits SET ${fields}, at = ? WHERE network = ? AND verdict_id = ? AND owner = ?`)
     .bind(...values, new Date().toISOString(), ...key).run();
@@ -76,15 +81,16 @@ async function processJob(env: Env, job: ExitJob, attempts: number, deps: ExitDe
     if (receipt.status !== 'success') throw new Error(`exit reverted (${hash})`);
     const [exited] = parseEventLogs({ abi: abis.guardianV2, eventName: 'Exited', logs: receipt.logs as never });
     const { shares = 0n, assets = 0n, remainingShares = 0n } = exited?.args ?? {};
-    await update(`status = 'confirmed', tx_hash = ?, assets = ?, remaining_shares = ?`, hash, assets.toString(), remainingShares.toString());
-    // Remaining shares valued at this exit's own share price, so no extra RPC is needed for the message.
     const partial = remainingShares > 0n && shares > 0n;
+    await update(`status = ?, tx_hash = ?, assets = ?, remaining_shares = ?`, partial ? 'partial' : 'confirmed', hash, assets.toString(), remainingShares.toString());
+    // Remaining shares valued at this exit's own share price, so no extra RPC is needed for the message.
     await addEvent(env.DB, {
       network, vault: job.vault, owner, txHash: hash,
       type: partial ? 'exit_partial' : 'exit_confirmed',
       message: partial ? `Partly out: ${usdc((remainingShares * assets) / shares)} USDC still locked` : "You're out",
     });
     log('exit_confirmed', { txHash: hash });
+    if (partial) await deps.requeue(job, PARTIAL_FOLLOWUP_S);
     return { ack: true };
   };
 

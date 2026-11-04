@@ -9,7 +9,7 @@ import type { PositionJudgment, VaultStats } from '../../shared/types';
 import { toOraclePost, type StateDocument } from '../../shared/verdict';
 import { postVerdict } from './archive';
 import { afterJudgment, decide } from './decide';
-import type { Env, ExitJob } from './env';
+import { isPaused, type Env, type ExitJob } from './env';
 import { realEnvioDeps, readFlows, readProtections, syncProtections } from './envio';
 import { safeError } from './errors';
 import { ALARM_MS } from './cadence';
@@ -159,7 +159,7 @@ export class VaultWatcher extends DurableObject<Env> {
   deps: WatcherDeps | null = null;
 
   async start(network: Network, vault: Address): Promise<void> {
-    if (!watched(network, vault)) { await this.ctx.storage.deleteAlarm(); return; }
+    if (!watched(network, vault) || isPaused(this.env, network)) { await this.ctx.storage.deleteAlarm(); return; }
     const prev = await this.ctx.storage.get<WatchState>('state');
     await this.ctx.storage.put('state', { network, vault, last: prev?.last ?? null } satisfies WatchState);
     // Re-arm unless a normal tick is already pending: an overdue alarm, or one pushed far out by retry backoff
@@ -177,7 +177,8 @@ export class VaultWatcher extends DurableObject<Env> {
     const state = await this.ctx.storage.get<WatchState>('state');
     if (!state) return;
     const vault = watched(state.network, state.vault);
-    if (!vault) return; // removed from config, or no oracle on that network: stop watching (no re-arm)
+    // Removed from config, no oracle on that network, or the network is paused: stop watching (no re-arm).
+    if (!vault || isPaused(this.env, state.network)) return;
     try {
       const last = await watchOnce(this.env.DB, vault, state.network, state.last, this.deps ?? (this.deps = this.realDeps()));
       // watchOnce hands back the same object on a skip tick; only write when the judged stats moved.
