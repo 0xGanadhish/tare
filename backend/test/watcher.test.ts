@@ -88,6 +88,18 @@ describe('VaultWatcher', () => {
     expect(await alarmOf(stub)).toBeNull();
   });
 
+  it('watcher: a paused network stops ticking, and start() arms nothing there', async () => {
+    const { deps, calls } = fakeDeps();
+    const stub = await startWatcher(deps);
+    const pause = (instance: VaultWatcher) => { (instance as unknown as { env: typeof env }).env = { ...env, PAUSED_NETWORKS: 'testnet' }; };
+    await runInDurableObject(stub, (instance: VaultWatcher) => pause(instance));
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(calls.judged).toBe(0);
+    expect(await alarmOf(stub)).toBeNull();
+    await runInDurableObject(stub, async (instance: VaultWatcher) => { await instance.start('testnet', MIRROR); });
+    expect(await alarmOf(stub)).toBeNull();
+  });
+
   it.skipIf(NETWORKS.mainnet.oracle !== UNDEPLOYED)('watcher: start() on a network without an oracle arms nothing', async () => {
     const { deps } = fakeDeps();
     const vault = '0x00000000000000000000000000000000000000c3' as const;
