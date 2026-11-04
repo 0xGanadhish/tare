@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { abis } from '../../shared/contracts';
 import { NETWORKS } from '../../shared/networks';
 import type { ExitJob } from '../src/env';
-import { handleExitBatch, type ExitDeps } from '../src/exits';
+import { handleExitBatch, PARTIAL_FOLLOWUP_S, type ExitDeps } from '../src/exits';
 import type { SendRequest, SendResult } from '../src/txSender';
 
 const VAULT = '0x7504b078d1f2b90fb9fcaf3d22753311013ea0ac' as const;
@@ -22,9 +22,11 @@ function exitedLog(shares: bigint, assets: bigint, remainingShares: bigint) {
 
 function fakeDeps(over: Partial<ExitDeps> = {}) {
   const sent: SendRequest[] = [];
+  const requeued: { job: ExitJob; delaySeconds: number }[] = [];
   const deps: ExitDeps = {
     simulate: async () => null,
     receipt: async () => null,
+    requeue: async (j, delaySeconds) => { requeued.push({ job: j, delaySeconds }); },
     sender: () => ({
       send: async (req: SendRequest): Promise<SendResult> => {
         sent.push(req);
@@ -33,8 +35,10 @@ function fakeDeps(over: Partial<ExitDeps> = {}) {
     }),
     ...over,
   };
-  return { deps, sent };
+  return { deps, sent, requeued };
 }
+
+const partialSender = () => ({ send: async (): Promise<SendResult> => ({ hash: `0x${'bb'.repeat(32)}`, status: 'success', blockNumber: 1n, gasUsed: 1n, logs: [exitedLog(600_000_000n, 600_000_000n, 400_000_000n)] }) });
 
 async function run(messages: { body: ExitJob; attempts?: number }[], deps: ExitDeps) {
   const batch = createMessageBatch<ExitJob>('tare-exits', messages.map((m, i) => ({ id: `m${i}`, timestamp: new Date(), attempts: m.attempts ?? 1, body: m.body })));
@@ -88,6 +92,44 @@ describe('exit consumer', () => {
     await run([{ body: job }], deps);
     const [event] = await eventsOf();
     expect(event).toMatchObject({ type: 'exit_partial', owner: OWNER, message: 'Partly out: 400 USDC still locked' });
+  });
+
+  it('partial exit requeues the same job after 30 s', async () => {
+    const { deps, requeued } = fakeDeps({ sender: partialSender });
+    const result = await run([{ body: job }], deps);
+    expect(PARTIAL_FOLLOWUP_S).toBe(30);
+    expect(requeued).toEqual([{ job, delaySeconds: 30 }]);
+    expect(result.explicitAcks).toEqual(['m0']);
+    expect(result.retryMessages).toEqual([]);
+    expect(await env.DB.prepare('SELECT status, remaining_shares FROM exits').first()).toEqual({ status: 'partial', remaining_shares: '400000000' });
+  });
+
+  it('follow-up exits the rest on the same verdict', async () => {
+    const { deps, sent, requeued } = fakeDeps();
+    await run([{ body: job }], { ...deps, sender: partialSender });
+    await run([{ body: requeued[0].job }], deps);
+    expect(sent).toHaveLength(1);
+    expect(requeued).toHaveLength(1);
+    expect(await env.DB.prepare('SELECT status, verdict_id, remaining_shares FROM exits').first()).toEqual({ status: 'confirmed', verdict_id: '7', remaining_shares: '0' });
+    expect((await eventsOf()).map((e) => e.type)).toEqual(['exit_partial', 'exit_confirmed']);
+  });
+
+  it('follow-up stops when the verdict is stale', async () => {
+    const { deps, sent, requeued } = fakeDeps({ sender: partialSender });
+    await run([{ body: job }], deps);
+    const followUp = await run([{ body: requeued[0].job }], { ...deps, simulate: async () => 'StaleVerdict' });
+    expect(sent).toHaveLength(0);
+    expect(requeued).toHaveLength(1);
+    expect(followUp.explicitAcks).toEqual(['m0']);
+    expect(followUp.retryMessages).toEqual([]);
+    expect(await env.DB.prepare('SELECT status, error FROM exits').first()).toEqual({ status: 'skipped', error: 'StaleVerdict' });
+  });
+
+  it('full exit does not requeue', async () => {
+    const { deps, requeued } = fakeDeps();
+    await run([{ body: job }], deps);
+    expect(requeued).toEqual([]);
+    expect(await env.DB.prepare('SELECT status FROM exits').first('status')).toBe('confirmed');
   });
 
   it('send throws → retried with backoff', async () => {
