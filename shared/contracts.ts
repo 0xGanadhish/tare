@@ -146,7 +146,7 @@ export const abis = {
     'event Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares)',
   ]),
   liquidityAdapter: parseAbi(['function availableLiquidity(address vault) view returns (uint256)']),
-  // Launch ABIs match reports/L1.md.
+  // Launch ABIs.
   launchFactory: parseAbi([
     'function guardian() view returns (address)',
     'function create(string name, string symbol, address reserveVault) returns (address)',
