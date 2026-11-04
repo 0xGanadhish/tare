@@ -114,6 +114,18 @@ describe('read API', () => {
     ]);
   });
 
+  it('score skips repeats', async () => {
+    const add = (id: number, verdict: number, postedAt: number, adverse: number) => env.DB.prepare(`INSERT INTO posts
+      (network, id, vault, verdict, confidence_bps, risk_bps, state_hash, posted_at, resolved, adverse) VALUES ('mainnet', ?, ?, ?, 8500, 9000, '0x', ?, 1, ?)`)
+      .bind(id, VAULT, verdict, postedAt, adverse).run();
+    for (let i = 0; i < 140; i++) await add(16 + i, 1, 1_792_000_000 + i * 30, 0); // one EXIT re-posted every 30 s, graded clear
+    await add(156, 0, 1_792_100_000, 0); // a later HOLD, graded clear: a hit
+    const body = await (await get('/v1/ledger/score?network=mainnet')).json<{ n: number; repeats: number; bands: { band: string; n: number; hitRate: number | null }[] }>();
+    expect(body.n).toBe(2);
+    expect(body.repeats).toBe(139);
+    expect(body.bands.find((b) => b.band === '80-89')).toEqual({ band: '80-89', n: 2, hitRate: 0.5 });
+  });
+
   it('unknown route → 404 JSON', async () => {
     const res = await get('/nope');
     expect(res.status).toBe(404);

@@ -15,6 +15,7 @@ const live: LedgerScore = {
     { band: '90-94', n: 1, hitRate: 0 },
     { band: '95-100', n: 6, hitRate: 4 / 6 },
   ],
+  repeats: 0,
 };
 
 describe('Scoreboard', () => {
@@ -51,19 +52,20 @@ describe('Scoreboard', () => {
   });
 
   test('explains the 15 Oct duplicate EXITs on mainnet, above the score, and nowhere else', () => {
-    // Live mainnet numbers on 2026-10-17: 14 right of 160 graded, the 140 duplicates all misses.
-    const mainnet: LedgerScore = { n: 160, brier: 0.6, early: false, bands: [
-      { band: '<80', n: 17, hitRate: 12 / 17 }, { band: '80-89', n: 103, hitRate: 2 / 103 }, { band: '90-94', n: 40, hitRate: 0 }, { band: '95-100', n: 0, hitRate: null },
+    // Live mainnet numbers on 2026-10-17 (14 right of 160 graded, the 140 duplicates all misses), counting the duplicates once.
+    const mainnet: LedgerScore = { n: 21, brier: 0.6, early: true, repeats: 139, bands: [
+      { band: '<80', n: 17, hitRate: 12 / 17 }, { band: '80-89', n: 3, hitRate: 2 / 3 }, { band: '90-94', n: 1, hitRate: 0 }, { band: '95-100', n: 0, hitRate: null },
     ] };
     const { unmount } = render(<Scoreboard score={mainnet} network="mainnet" />);
     const note = screen.getByRole('note', { name: 'About the 15 Oct verdicts' });
     const text = note.textContent ?? '';
     expect(text).toMatch(/140/);
     expect(text).toMatch(/#16–#155/);
-    expect(text).toMatch(/Leaving them out, Jev was right 14 of 20 times \(70%\)/);
+    expect(text).toMatch(/counts it once, as one miss, and leaves out the other 139/);
     expect(text).toMatch(/fixed/i);
+    expect(screen.getByText('139 repeat posts not counted (same call on the same vault within an hour)')).toBeTruthy();
     // Above the headline sentence, so it is read before the numbers.
-    const sentence = screen.getByText('Jev was right 14 of 160 times.');
+    const sentence = screen.getByText('Jev was right 14 of 21 times.');
     expect(note.compareDocumentPosition(sentence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     unmount();
     render(<Scoreboard score={live} network="testnet" />);
